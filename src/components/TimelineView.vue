@@ -277,4 +277,22 @@ function handleBarClick(row) {
 }
 .empty p { margin: 0 0 6px; font-size: 14px; }
 .empty .sub { font-size: 12px; color: #c9cfd8; margin: 0; }
+
+/* ================= 移动端适配 ================= */
+@media (max-width: 768px) {
+  .timeline { padding: 10px 8px; border-radius: 10px; }
+
+  .timeline-head { margin-bottom: 8px; }
+  .timeline-head h2 { font-size: 14px; }
+  .sub { font-size: 11px; margin-top: 2px; }
+  .outside { display: none; } /* 太窄，先隐藏 */
+
+  .axis-cell { padding: 4px 0 5px; }
+  .axis-date { font-size: 10px; }
+  .axis-week { font-size: 8px; }
+
+  .row { height: 36px; }
+  .bar { top: 5px; height: 26px; padding: 0 6px; }
+  .bar-title { font-size: 10px; }
+}
 </style>

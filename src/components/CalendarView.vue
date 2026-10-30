@@ -263,7 +263,7 @@ function stopResize() {
 .count { justify-self: end; font-size: 12px; color: #a1a8b3; }
 
 /* ---------- Grid ---------- */
-.calendar-scroll-wrapper { flex: 1; overflow: auto; position: relative; }
+.calendar-scroll-wrapper { flex: 1; width: 100%; min-width: 0; overflow: auto; position: relative; }
 
 .calendar-grid {
   display: grid;
@@ -366,4 +366,70 @@ function stopResize() {
   border-radius: 0 0 12px 0; transition: background 0.2s ease;
 }
 .resize-handle:hover { background: linear-gradient(135deg, transparent 50%, #c2c9d1 50%); }
+
+/* ================= 移动端适配 ================= */
+@media (max-width: 768px) {
+  .calendar-container {
+    height: calc(100dvh - 104px); min-height: 360px;
+    padding: 10px 8px; border-radius: 10px;
+  }
+  .resize-handle { display: none; } /* 触屏拖拽体验差，直接关掉 */
+
+  .header { margin-bottom: 8px; }
+  .title { min-width: 96px; font-size: 14px; }
+  .today-btn { padding: 5px 10px; font-size: 12px; }
+  .nav-btn { width: 26px; height: 26px; font-size: 15px; }
+  .count { display: none; } /* 标题栏太窄，隐藏统计 */
+
+  /* 一屏看全七天：7 列等分，不再横向滚动 */
+  .calendar-grid {
+    min-width: 0;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-auto-rows: minmax(58px, 1fr);
+  }
+  .weekday-cell { padding: 4px 0 6px; font-size: 10px; }
+  .day-cell { padding: 4px 2px 3px; }
+  .day-number { width: 16px; height: 16px; font-size: 10px; }
+
+  .bars { gap: 1px; margin-bottom: 1px; }
+  .bar { height: 8px; margin: 0 1px; border-radius: 2px; }
+  .bar.mid { margin: 0 -2px; }
+  .bar-title { font-size: 7px; line-height: 8px; padding: 0 2px; }
+
+  .singles { margin-top: 1px; }
+  .event { padding: 0 2px; gap: 2px; }
+  .dot { width: 5px; height: 5px; }
+  .event-title { font-size: 8.5px; }
+  .more { font-size: 8px; }
+
+  .empty-state p { font-size: 13px; }
+  .empty-state .sub-hint { font-size: 11px; }
+}
+
+/* 小屏手机（≤400px）：一屏七天时单格只有 ~45px，文字必须再收一档 */
+@media (max-width: 400px) {
+  .calendar-container { padding: 8px 6px; }
+  .calendar-grid { grid-auto-rows: minmax(52px, 1fr); }
+
+  .weekday-cell { padding: 3px 0 5px; font-size: 9px; }
+  .day-cell { padding: 3px 1px 2px; }
+  .day-number { width: 15px; height: 15px; font-size: 9px; }
+
+  /* 多日横条只留色条，放不下标题 */
+  .bars { gap: 1px; margin-bottom: 1px; }
+  .bar { height: 6px; margin: 0; border-radius: 2px; }
+  .bar.mid { margin: 0 -1px; }
+  .bar-title { display: none; }
+
+  /* 单日日程只留小圆点，横向排布不占高度 */
+  .singles {
+    flex-direction: row; flex-wrap: wrap; justify-content: center;
+    gap: 2px; margin-top: 2px;
+  }
+  .event { width: auto; padding: 0; gap: 0; justify-content: center; }
+  .event:hover { background: none; }
+  .event-title { display: none; }
+  .dot { width: 5px; height: 5px; }
+  .more { font-size: 7px; margin-top: 1px; }
+}
 </style>

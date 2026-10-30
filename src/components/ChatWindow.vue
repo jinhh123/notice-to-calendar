@@ -91,4 +91,16 @@ button {
 button:not(:disabled):hover { background: #0e5fd8; box-shadow: 0 4px 12px rgba(22,119,255,0.3); transform: translateY(-1px); }
 button:not(:disabled):active { transform: translateY(0); }
 button:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; transform: none; }
+
+/* ================= 移动端适配 ================= */
+@media (max-width: 768px) {
+  .chat { padding: 10px; border-radius: 10px; }
+  /* 输入区压短，消息区最多占三成屏高，避免把侧边栏撑满 */
+  .messages { min-height: 70px; max-height: 30vh; margin-bottom: 8px; }
+  .bubble { font-size: 12px; padding: 6px 10px; border-radius: 8px; }
+  .hint { font-size: 12px; }
+  .input-row { gap: 6px; }
+  textarea { height: 64px; font-size: 13px; padding: 8px; }
+  button { padding: 8px 14px; font-size: 12px; border-radius: 8px; }
+}
 </style>

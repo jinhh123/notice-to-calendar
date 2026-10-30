@@ -15,6 +15,7 @@ const currentView = ref('calendar')
 const sidebarCollapsed = ref(false) // 新增：控制侧边栏折叠
 const chatWindowRef = ref(null) // 新增：用于向聊天窗口回写提示消息
 const isParsing = ref(false) // 解析中：防重复提交
+const drawerOpen = ref(false) // 移动端抽屉是否展开
 
 // 日程的日期键：持续日程取 startDate，单日日程从 time 归一化
 function dateKey(s) {
@@ -106,6 +107,12 @@ function closeModal() {
   selectedDay.value = null
 }
 
+// 切换视图（移动端同时收起抽屉）
+function switchView(view) {
+  currentView.value = view
+  drawerOpen.value = false
+}
+
 // 弹窗标题：优先用 dateStr 拼出「11月2日」，避免跨月歧义
 function formatDayTitle(day) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day?.dateStr || '')
@@ -126,8 +133,11 @@ const viewTitle = computed(() => {
 
 <template>
   <div class="app-layout">
-    <!-- 左侧边栏（支持折叠） -->
-    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
+    <!-- 移动端抽屉遮罩：点击关闭 -->
+    <div class="drawer-mask" v-if="drawerOpen" @click="drawerOpen = false"></div>
+
+    <!-- 左侧边栏（桌面端折叠 / 移动端抽屉） -->
+    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed, 'drawer-open': drawerOpen }">
       <div class="sidebar-top">
         <div class="logo" v-if="!sidebarCollapsed">通知随手记</div>
         <button class="collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed">
@@ -136,9 +146,9 @@ const viewTitle = computed(() => {
       </div>
       
       <nav class="nav" v-if="!sidebarCollapsed">
-        <a class="nav-item" :class="{ active: currentView === 'calendar' }" @click="currentView = 'calendar'">📅 日历视图</a>
-        <a class="nav-item" :class="{ active: currentView === 'timeline' }" @click="currentView = 'timeline'">📊 时间线视图</a>
-        <a class="nav-item" :class="{ active: currentView === 'list' }" @click="currentView = 'list'">📋 所有日程</a>
+        <a class="nav-item" :class="{ active: currentView === 'calendar' }" @click="switchView('calendar')">📅 日历视图</a>
+        <a class="nav-item" :class="{ active: currentView === 'timeline' }" @click="switchView('timeline')">📊 时间线视图</a>
+        <a class="nav-item" :class="{ active: currentView === 'list' }" @click="switchView('list')">📋 所有日程</a>
         <a class="nav-item">⚙️ 设置</a>
       </nav>
       
@@ -150,6 +160,7 @@ const viewTitle = computed(() => {
     <!-- 右侧主内容区 -->
     <main class="main-content">
       <header class="main-header">
+        <button class="menu-btn" @click="drawerOpen = true" aria-label="打开菜单">☰</button>
         <h1>{{ viewTitle }}</h1>
         <div class="actions">
           <button class="export ghost" @click="handleExportICS">导出日历(.ics)</button>
@@ -380,4 +391,56 @@ pre {
 }
 .close-btn:hover { background: #0e5fd8; box-shadow: 0 4px 12px rgba(22,119,255,0.28); }
 .important-badge { color: #f5222d; font-size: 12px; margin-right: 4px; }
+
+/* 移动端汉堡按钮：桌面端隐藏 */
+.menu-btn {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border: 1px solid #eceef1; background: #fff; border-radius: 9px;
+  color: #57606a; font-size: 16px; line-height: 1;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.menu-btn:hover { background: #f4f4f5; color: #1f2328; }
+
+/* 抽屉遮罩：仅移动端渲染 */
+.drawer-mask { display: none; }
+
+/* ================= 移动端适配 ================= */
+@media (max-width: 768px) {
+  .app-layout { flex-direction: column; height: 100dvh; }
+
+  /* 遮罩 */
+  .drawer-mask {
+    display: block; position: fixed; inset: 0; z-index: 150;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  /* 侧边栏改为抽屉：默认移出屏幕，展开时滑入 */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
+    width: 82vw; max-width: 320px; padding: 16px;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  }
+  .sidebar.collapsed { width: 82vw; padding: 16px; }
+  .sidebar.drawer-open { transform: translateX(0); }
+  .collapse-btn { display: none; }
+
+  /* 主内容区 */
+  .main-content { padding: 12px; min-width: 0; overflow-x: hidden; }
+  .main-header { flex-wrap: wrap; row-gap: 8px; gap: 8px; margin-bottom: 12px; }
+  .menu-btn { display: flex; }
+  .main-header h1 {
+    flex: 1; min-width: 0; font-size: 17px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* 按钮独占一行，避免和标题抢宽度被裁切 */
+  .actions { flex: 1 0 100%; justify-content: flex-start; gap: 6px; }
+  .export { padding: 7px 12px; font-size: 12px; border-radius: 8px; }
+
+  .content-body { padding: 10px; border-radius: 10px; }
+  .nav-item { padding: 11px 12px; } /* 放大触控区域 */
+}
 </style>
