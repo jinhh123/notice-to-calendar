@@ -21,7 +21,8 @@ export function saveSchedules(list) {
 
 export function addSchedule(item) {
   const list = loadSchedules()
-  item.id = Date.now().toString()
+  // 用 UUID 代替 Date.now()：同一毫秒并发写入也不会撞 id，避免误删两条
+  item.id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
   list.unshift(item)
   saveSchedules(list)
   return list

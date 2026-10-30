@@ -89,8 +89,55 @@ function handleSave(schedule) {
 async function handleExport() {
   if (!schedules.value.length) return alert('还没有日程可导出')
   if (currentView.value === 'list') return alert('请切换到日历视图或时间线视图后再导出')
-  const target = currentView.value === 'timeline' ? 'timeline-wrapper' : 'calendar-wrapper'
-  await exportToImage(target)
+
+  if (currentView.value === 'timeline') {
+    await exportTimelineImage()
+    return
+  }
+  await exportToImage('calendar-wrapper')
+}
+
+// 时间线是横向滚动的，导出前临时把容器撑到 scrollWidth，
+// 否则 html2canvas 只会截到可视区域那一段
+async function exportTimelineImage() {
+  const wrapper = document.getElementById('timeline-wrapper')
+  const card = wrapper?.querySelector('.timeline')
+  const scroller = wrapper?.querySelector('.timeline-scroll')
+  if (!wrapper || !card || !scroller) {
+    await exportToImage('timeline-wrapper', '排期时间线.png')
+    return
+  }
+
+  const cardStyle = getComputedStyle(card)
+  const padX = (parseFloat(cardStyle.paddingLeft) || 0) + (parseFloat(cardStyle.paddingRight) || 0)
+  const fullWidth = Math.ceil(scroller.scrollWidth + padX)
+
+  // 记录原始内联样式，导出后原样还原
+  const snapshot = new Map([
+    [wrapper, wrapper.getAttribute('style')],
+    [card, card.getAttribute('style')],
+    [scroller, scroller.getAttribute('style')]
+  ])
+
+  wrapper.style.width = fullWidth + 'px'
+  wrapper.style.height = 'auto'
+  card.style.width = '100%'
+  card.style.height = 'auto'
+  card.style.overflow = 'visible'
+  scroller.style.width = '100%'
+  scroller.style.height = 'auto'
+  scroller.style.overflow = 'visible'
+
+  try {
+    // 等两帧，确保布局和 canvas 尺寸都已更新
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    await exportToImage('timeline-wrapper', '排期时间线.png')
+  } finally {
+    snapshot.forEach((style, el) => {
+      if (style === null) el.removeAttribute('style')
+      else el.setAttribute('style', style)
+    })
+  }
 }
 
 // 导出 .ics：可导入系统日历 / Google Calendar / Outlook，与视图无关

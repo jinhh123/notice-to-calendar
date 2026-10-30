@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
       vue(),
       VitePWA({
         registerType: 'autoUpdate', // 新版本发布后自动更新 SW，用户无需手动清缓存
-        injectRegister: 'auto', // 自动往 index.html 注入注册脚本
+        injectRegister: false, // 改为在 main.js 手动注册，便于监听 controllerchange
         includeAssets: [],
         manifest: {
           name: '通知随手记',

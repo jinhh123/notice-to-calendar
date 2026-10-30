@@ -114,9 +114,32 @@ const ACTION_WORDS = [
   '提交', '截止', '投稿', '实习', '实践'
 ]
 
+// 相对日期同样算「明确的时间信号」（明天开会 = 有效日程）
+const RELATIVE_DAY_RE = /(今天|明天|后天|大后天|今日|明日)/
+
 function hasScheduleSignal(text) {
   if (DATE_RE.test(text)) return true
+  if (RELATIVE_DAY_RE.test(text)) return true
   return ACTION_WORDS.some(w => text.includes(w))
+}
+
+// 去掉时间片段，剩下的才是「事件本身」，用于本地降级时生成标题
+function stripTimeText(raw) {
+  return String(raw || '')
+    // 10月15日 / 10月15日-10月17日 / 10月15日至17日
+    .replace(/\d{1,2}\s*月\s*\d{1,2}\s*[日号](\s*[-—至到~]\s*(\d{1,2}\s*月\s*)?\d{1,2}\s*[日号])?/g, '')
+    // 今天 / 明天 / 后天 / 大后天
+    .replace(/(今天|明天|后天|大后天|今日|明日)/g, '')
+    // 周三 / 下周三 / 本周日 / 星期一
+    .replace(/(下下|下|这|本)?\s*(周|星期|礼拜)\s*[一二三四五六日天1-7]/g, '')
+    // 下午2点 / 14:30 / 9点30分
+    .replace(/(上午|下午|中午|晚上|凌晨|早上|傍晚)?\s*\d{1,2}\s*[点:：]\s*(\d{1,2}\s*分?)?/g, '')
+    // 残留的时段词
+    .replace(/(上午|下午|中午|晚上|凌晨|早上|傍晚)/g, '')
+    // 开头常见的「请于 / 请 / 望」
+    .replace(/^(请于|请|务必|望)+/, '')
+    // 标点与空白
+    .replace(/[，,。；;：:、！!？?\s]+/g, '')
 }
 
 // 本地正则解析（备用方案）
@@ -164,8 +187,9 @@ function localFallbackParse(text) {
   if (titleMatch) {
     result.title = titleMatch[1]
   } else {
-    // 没有明显标题时，取原文前 10 个字符兜底，避免「未命名日程」
-    result.title = String(text).replace(/\s+/g, '').slice(0, 10) || '未命名日程'
+    // 先把时间片段剔除，再截断，避免标题变成「10月15日下午2点」
+    const stripped = stripTimeText(text)
+    result.title = stripped.slice(0, 10) || '未命名日程'
   }
 
   const locMatch = text.match(/([^\s，,。；;]{2,15}(报告厅|图书馆|教学楼|体育馆|会议室|楼|室|厅|馆|场))/)
