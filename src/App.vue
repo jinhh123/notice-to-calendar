@@ -277,25 +277,30 @@ const viewTitle = computed(() => {
 
         <div class="detail-list">
           <section v-for="s in selectedDay.schedules" :key="s.id" class="detail-card">
-            <div class="field">
-              <label>标题</label>
-              <input v-model="s.title" placeholder="未命名日程" @change="handleSave(s)" />
-            </div>
-            <div class="field">
-              <label>时间</label>
-              <input v-model="s.time" placeholder="如 10月15日下午2点" @change="handleSave(s)" />
-            </div>
-            <div class="field">
-              <label>地点</label>
-              <input v-model="s.location" placeholder="未填写" @change="handleSave(s)" />
-            </div>
-            <div class="field">
-              <label>单位</label>
-              <input v-model="s.unit" placeholder="未填写" @change="handleSave(s)" />
-            </div>
-            <div class="field">
-              <label>学分</label>
-              <input v-model="s.credit" placeholder="未填写" @change="handleSave(s)" />
+            <div class="form-container">
+              <!-- 长字段：整行 -->
+              <div class="field span-2">
+                <label>标题</label>
+                <input v-model="s.title" placeholder="未命名日程" @change="handleSave(s)" />
+              </div>
+              <div class="field span-2">
+                <label>时间</label>
+                <input v-model="s.time" placeholder="如 10月15日下午2点" @change="handleSave(s)" />
+              </div>
+              <div class="field span-2">
+                <label>地点</label>
+                <input v-model="s.location" placeholder="未填写" @change="handleSave(s)" />
+              </div>
+
+              <!-- 短字段：两列并排 -->
+              <div class="field">
+                <label>单位</label>
+                <input v-model="s.unit" placeholder="未填写" @change="handleSave(s)" />
+              </div>
+              <div class="field">
+                <label>学分</label>
+                <input v-model="s.credit" placeholder="未填写" @change="handleSave(s)" />
+              </div>
             </div>
 
             <div class="switch-row">
@@ -472,6 +477,16 @@ const viewTitle = computed(() => {
 }
 .detail-card:last-child { margin-bottom: 0; }
 
+/* 表单容器：两列网格，短字段并排、长字段整行 */
+.form-container {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+  margin-bottom: 10px;
+}
+.form-container .field { margin-bottom: 0; }
+.field.span-2 { grid-column: span 2; }
+
 /* 表单行：label 左、输入右 */
 .field { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .field label {
@@ -634,5 +649,9 @@ pre {
 
   .content-body { padding: 10px; border-radius: 10px; }
   .nav-item { padding: 11px 12px; } /* 放大触控区域 */
+
+  /* 窄屏上并排会把文字挤成省略号，短字段退回单列 */
+  .form-container { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .field.span-2 { grid-column: auto; }
 }
 </style>
