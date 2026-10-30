@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { normalizeDate, getBeijingToday } from '../modules/parser'
-import { withAlpha, darken } from '../modules/color'
+import { withAlpha } from '../modules/color'
 
 const props = defineProps(['schedules'])
 const emit = defineEmits(['day-click'])
@@ -108,7 +108,8 @@ const rows = computed(() => {
   return { list, outside }
 })
 
-const gridImage = `repeating-linear-gradient(to right, #f1f2f4 0 1px, transparent 1px ${DAY_WIDTH}px)`
+// 网格线更淡，避免视觉上穿透胶囊
+const gridImage = `repeating-linear-gradient(to right, #f5f5f5 0 1px, transparent 1px ${DAY_WIDTH}px)`
 
 // 点击胶囊：复用日历的弹窗逻辑
 function handleBarClick(row) {
@@ -168,8 +169,7 @@ function handleBarClick(row) {
               :style="{
                 left: row.left + 'px',
                 width: row.width + 'px',
-                backgroundColor: withAlpha(row.color, 0.18),
-                color: darken(row.color)
+                backgroundColor: withAlpha(row.color, 0.18)
               }"
               :title="`${row.title}${row.time ? ' · ' + row.time : ''}（${row.duration}）`"
               @click="handleBarClick(row)"
@@ -240,12 +240,12 @@ function handleBarClick(row) {
 .day-bg.today { background: #f5f9ff; }
 
 .today-line {
-  position: absolute; top: 0; bottom: 0; left: 0; width: 1px;
+  position: absolute; z-index: 3; top: 0; bottom: 0; left: 0; width: 1px;
   background: #cfe3ff; pointer-events: none;
 }
 
 .row {
-  position: relative; height: 40px;
+  position: relative; z-index: 1; height: 40px;
   border-bottom: 1px solid #f6f7f8;
   transition: background 0.15s ease;
 }
@@ -253,7 +253,7 @@ function handleBarClick(row) {
 
 /* ---------- 长条 ---------- */
 .bar {
-  position: absolute; top: 7px; height: 26px;
+  position: absolute; z-index: 2; top: 7px; height: 26px;
   border-radius: 8px; display: flex; align-items: center; justify-content: center;
   padding: 0 10px; box-sizing: border-box; overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -265,8 +265,12 @@ function handleBarClick(row) {
 .bar.clip-right { border-top-right-radius: 2px; border-bottom-right-radius: 2px; }
 
 .bar-title {
-  font-size: 11px; font-weight: 600; color: inherit; line-height: 1;
+  font-size: 11px; font-weight: 600; line-height: 1;
+  /* 强制深色字 + 白色描边，浅色胶囊背景上也读得清 */
+  color: #1f2328;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
   width: 100%; text-align: center;
+  padding: 0 6px; /* 避免文字顶到圆角 */
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
