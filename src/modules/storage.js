@@ -3,8 +3,16 @@
 const KEY = 'notice_schedules'
 
 export function loadSchedules() {
-  const raw = localStorage.getItem(KEY)
-  return raw ? JSON.parse(raw) : []
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    // 数据结构被手动改坏时同样不能崩，直接当作空列表
+    return Array.isArray(parsed) ? parsed : []
+  } catch (err) {
+    console.warn('本地日程数据读取失败，已降级为空列表:', err)
+    return []
+  }
 }
 
 export function saveSchedules(list) {

@@ -7,10 +7,10 @@ function getRandomColor() {
   return colors[Math.floor(Math.random() * colors.length)]
 }
 
-// 修正 AI 可能提取错的年份
+// 修正 AI 可能提取错的年份（按北京时间的年份）
 function fixDateYear(dateStr) {
   if (!dateStr) return ''
-  const currentYear = new Date().getFullYear()
+  const currentYear = beijingYear()
   // 如果 AI 给了 "2023-10-20" 这种格式，强行替换成 2026
   const match = dateStr.match(/\d{4}-(\d{2})-(\d{2})/)
   if (match) {
@@ -24,7 +24,7 @@ export async function parseText(text) {
     // 构造给 DeepSeek 的提示词
     const systemPrompt = `你是一个校园通知提取助手。请提取文本信息并返回严格的 JSON。
 注意：
-- title：提取核心事件或动作（例如"看眼睛"、"开会"），绝不能填"未命名日程"。
+- title：必须是核心事件总结（限 10 字以内）；如果原文没有明显的标题，请直接从原文本中提取前 10 个字符作为标题（例如"文科楼开会"），绝对禁止返回"未命名日程"！
 - time：提取时间描述（如"明天"）。
 - isDuration：如果是持续多天的日程才设为 true。
 - startDate/endDate：如果不是明确的持续多天日程，这两个字段必须填空字符串 ""，绝对禁止自行编造日期（如 2026-01-01）。
@@ -109,8 +109,7 @@ function localFallbackParse(text) {
     throw new Error('文本中未检测到有效日程')
   }
 
-  const now = new Date()
-  const currentYear = now.getFullYear()
+  const currentYear = beijingYear()
   const result = {
     title: '未命名日程', time: '', location: '', items: [], unit: '',
     credit: '', source: text, isImportant: false, isDuration: false,
@@ -143,7 +142,12 @@ function localFallbackParse(text) {
   }
 
   const titleMatch = text.match(/(关于[^的]{2,20}的通知)/)
-  if (titleMatch) result.title = titleMatch[1]
+  if (titleMatch) {
+    result.title = titleMatch[1]
+  } else {
+    // 没有明显标题时，取原文前 10 个字符兜底，避免「未命名日程」
+    result.title = String(text).replace(/\s+/g, '').slice(0, 10) || '未命名日程'
+  }
 
   const locMatch = text.match(/([^\s，,。；;]{2,15}(报告厅|图书馆|教学楼|体育馆|会议室|楼|室|厅|馆|场))/)
   if (locMatch) result.location = locMatch[1]
@@ -176,6 +180,16 @@ function dayNumberToString(dayNumber) {
   const m = String(d.getUTCMonth() + 1).padStart(2, '0')
   const day = String(d.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+// 北京时间的年份（跨年零点也不会取错）
+function beijingYear(date = new Date()) {
+  return Number(dayNumberToString(beijingDayNumber(date)).slice(0, 4))
+}
+
+// 北京时间的今天（YYYY-MM-DD），供日历等组件统一取用
+export function getBeijingToday(date = new Date()) {
+  return dayNumberToString(beijingDayNumber(date))
 }
 
 // 天序号对应的星期几（周一=1 … 周日=7）

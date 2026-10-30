@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import ChatWindow from './components/ChatWindow.vue'
 import CalendarView from './components/CalendarView.vue'
+import TimelineView from './components/TimelineView.vue'
 import { parseText } from './modules/parser'
 import { loadSchedules, addSchedule, removeSchedule, updateSchedule } from './modules/storage'
 // 注意：这里假设你已经把 ics.js 改成了 exporter.js 并实现了图片导出。如果还没改，这行会报错，请告诉我。
@@ -32,6 +33,9 @@ async function handleSend(text) {
     // 解析异常 / 文本无效，统一拦在这里：只提示，绝不落库
     console.error('解析失败:', err)
     chatWindowRef.value?.addAiMessage('❌ 未识别到有效的时间信息，请补充具体的日期或时间。')
+  } finally {
+    // 无论成功失败都要解锁，否则按钮会一直停在「解析中…」
+    chatWindowRef.value?.setLoading(false)
   }
 }
 function handleRemove(id) {
@@ -53,7 +57,9 @@ function handleSave(schedule) {
 
 async function handleExport() {
   if (!schedules.value.length) return alert('还没有日程可导出')
-  await exportToImage('calendar-wrapper')
+  if (currentView.value === 'list') return alert('请切换到日历视图或时间线视图后再导出')
+  const target = currentView.value === 'timeline' ? 'timeline-wrapper' : 'calendar-wrapper'
+  await exportToImage(target)
 }
 
 function handleDayClick(day) {
@@ -64,8 +70,21 @@ function closeModal() {
   selectedDay.value = null
 }
 
+// 弹窗标题：优先用 dateStr 拼出「11月2日」，避免跨月歧义
+function formatDayTitle(day) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day?.dateStr || '')
+  if (!m) return `${day?.day ?? ''}日 日程详情`
+  return `${Number(m[2])}月${Number(m[3])}日 日程详情`
+}
+
 const sortedSchedules = computed(() => {
   return [...schedules.value].sort((a, b) => b.id - a.id)
+})
+
+// 顶部标题随视图切换
+const viewTitle = computed(() => {
+  if (currentView.value === 'timeline') return '排期时间线'
+  return currentView.value === 'calendar' ? '我的日程' : '所有日程清单'
 })
 </script>
 
@@ -82,11 +101,12 @@ const sortedSchedules = computed(() => {
       
       <nav class="nav" v-if="!sidebarCollapsed">
         <a class="nav-item" :class="{ active: currentView === 'calendar' }" @click="currentView = 'calendar'">📅 日历视图</a>
+        <a class="nav-item" :class="{ active: currentView === 'timeline' }" @click="currentView = 'timeline'">📊 时间线视图</a>
         <a class="nav-item" :class="{ active: currentView === 'list' }" @click="currentView = 'list'">📋 所有日程</a>
         <a class="nav-item">⚙️ 设置</a>
       </nav>
       
-      <div class="sidebar-bottom" v-if="!sidebarCollapsed">
+      <div class="sidebar-bottom" v-show="!sidebarCollapsed">
         <ChatWindow ref="chatWindowRef" @send="handleSend" />
       </div>
     </aside>
@@ -94,7 +114,7 @@ const sortedSchedules = computed(() => {
     <!-- 右侧主内容区 -->
     <main class="main-content">
       <header class="main-header">
-        <h1>{{ currentView === 'calendar' ? '我的日程' : '所有日程清单' }}</h1>
+        <h1>{{ viewTitle }}</h1>
         <button class="export" @click="handleExport">导出图片</button>
       </header>
       
@@ -102,10 +122,19 @@ const sortedSchedules = computed(() => {
         <div v-if="currentView === 'calendar'" id="calendar-wrapper">
           <CalendarView :schedules="schedules" @day-click="handleDayClick" />
         </div>
-        
+
+        <div v-else-if="currentView === 'timeline'" id="timeline-wrapper">
+          <TimelineView :schedules="schedules" />
+        </div>
+
         <div v-else class="list-view">
           <div v-if="!sortedSchedules.length" class="empty-hint">暂无日程，去左侧粘贴一条通知试试吧～</div>
-          <div v-for="s in sortedSchedules" :key="s.id" class="list-item">
+          <div
+            v-for="s in sortedSchedules"
+            :key="s.id"
+            class="list-item"
+            :style="{ '--accent': s.color || '#1677ff' }"
+          >
             <div class="list-item-header">
               <span class="list-title">
                 <span v-if="s.isImportant" class="important-badge">⚠️ 重要</span>
@@ -129,7 +158,7 @@ const sortedSchedules = computed(() => {
     <div class="modal-overlay" v-if="selectedDay" @click.self="closeModal">
       <div class="modal-content">
         <h3>
-          {{ selectedDay.day }}日 日程详情
+          {{ formatDayTitle(selectedDay) }}
           <span v-if="selectedDay.schedules.some(s => s.isDuration)" class="duration-tip">
             （含持续日程）
           </span>
@@ -194,7 +223,7 @@ const sortedSchedules = computed(() => {
 
 <style scoped>
 .app-layout {
-  display: flex; height: 100vh; background: #f8f9fa;
+  display: flex; height: 100vh; background: #f9fafb;
   font-family: -apple-system, "PingFang SC", sans-serif; color: #1f2328;
 }
 
@@ -224,7 +253,7 @@ const sortedSchedules = computed(() => {
 .sidebar-bottom { margin-top: auto; }
 
 /* 主内容区样式 */
-.main-content { flex: 1; display: flex; flex-direction: column; padding: 24px; overflow: hidden; background: #f8f9fa; }
+.main-content { flex: 1; display: flex; flex-direction: column; padding: 24px; overflow: hidden; background: #f9fafb; }
 .main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
 .main-header h1 { font-size: 20px; font-weight: 650; color: #1f2328; margin: 0; }
 .export {
@@ -236,15 +265,23 @@ const sortedSchedules = computed(() => {
 .export:active { transform: translateY(0); }
 .content-body {
   flex: 1; overflow: hidden; background: #fff; border-radius: 12px; padding: 18px;
-  border: 1px solid #eceef1; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid #f0f1f3; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
+#calendar-wrapper, #timeline-wrapper { height: 100%; }
 
 /* 列表视图样式 */
 .list-view { height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
 .empty-hint { text-align: center; color: #9aa4af; margin-top: 40px; font-size: 14px; }
 .list-item {
-  border: 1px solid #eceef1; border-radius: 12px; padding: 16px; background: #fff;
+  position: relative; overflow: hidden;
+  border: 1px solid #eceef1; border-radius: 12px; padding: 16px 16px 16px 20px;
+  background: #fbfcfd;
   box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: all 0.2s ease;
+}
+/* 左侧颜色竖条：颜色取自该日程的 color */
+.list-item::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background: var(--accent, #1677ff);
 }
 .list-item:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-color: #e3e7ec; transform: translateY(-1px); }
 .list-item-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }

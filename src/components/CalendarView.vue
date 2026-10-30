@@ -1,47 +1,116 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { normalizeDate } from '../modules/parser'
+import { normalizeDate, getBeijingToday } from '../modules/parser'
+import { withAlpha, darken } from '../modules/color'
 
 const props = defineProps(['schedules'])
 const emit = defineEmits(['day-click'])
 
-const currentView = ref('month')
-const now = new Date()
-const year = now.getFullYear()
-const month = now.getMonth()
+const pad = (n) => String(n).padStart(2, '0')
+const formatDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
-// 获取今天的日期字符串，用于高亮
-const todayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+// 全站统一按北京时间判定“今天”，避免半夜跨日
+const todayStr = getBeijingToday()
 
-const daysInMonth = new Date(year, month + 1, 0).getDate()
-const firstDay = new Date(year, month, 1).getDay()
-const startPad = firstDay === 0 ? 6 : firstDay - 1
-
-const allDays = computed(() => {
-  const days = []
-  for (let i = 0; i < startPad; i++) days.push({ day: null, schedules: [] })
-  
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    const daySchedules = props.schedules.filter(s => {
-      if (s.isDuration && s.startDate && s.endDate) {
-        return dateStr >= s.startDate && dateStr <= s.endDate
-      }
-      return normalizeDate(s.time) === dateStr
-    })
-    days.push({ day: d, dateStr, schedules: daySchedules })
-  }
-  
-  while (days.length < 42) days.push({ day: null, schedules: [] })
-  return days
-})
-
-// 判断本月是否有任何日程（用于空状态）
-const hasAnySchedule = computed(() => props.schedules.length > 0)
+// 当前展示的年月（0-11 表示月份），也取北京时间的年月
+const currentYear = ref(Number(todayStr.slice(0, 4)))
+const currentMonth = ref(Number(todayStr.slice(5, 7)) - 1)
 
 const weekDays = ['一', '二', '三', '四', '五', '六', '日']
+const MAX_BARS = 2 // 顶部多日横条最多显示几条
+const MAX_SINGLES = 3 // 单日文字列表最多显示几条
 
-// 拖拽（带边界限制）
+const monthLabel = computed(() => `${currentYear.value}年${currentMonth.value + 1}月`)
+
+function prevMonth() {
+  if (currentMonth.value === 0) {
+    currentMonth.value = 11
+    currentYear.value -= 1
+  } else {
+    currentMonth.value -= 1
+  }
+}
+
+function nextMonth() {
+  if (currentMonth.value === 11) {
+    currentMonth.value = 0
+    currentYear.value += 1
+  } else {
+    currentMonth.value += 1
+  }
+}
+
+function goToday() {
+  const today = getBeijingToday()
+  currentYear.value = Number(today.slice(0, 4))
+  currentMonth.value = Number(today.slice(5, 7)) - 1
+}
+
+// 固定 42 格：上月补尾 + 本月 + 下月补头
+const days = computed(() => {
+  const singleMap = new Map()
+  const durationList = []
+
+  for (const s of props.schedules) {
+    if (s.isDuration && s.startDate && s.endDate) {
+      durationList.push(s)
+      continue
+    }
+    const key = normalizeDate(s.time)
+    if (!key) continue
+    if (!singleMap.has(key)) singleMap.set(key, [])
+    singleMap.get(key).push(s)
+  }
+
+  const firstDay = new Date(currentYear.value, currentMonth.value, 1)
+  const offset = (firstDay.getDay() + 6) % 7 // 周一为一周起点
+  const startDate = new Date(currentYear.value, currentMonth.value, 1 - offset)
+
+  const list = []
+  for (let i = 0; i < 42; i++) {
+    const date = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i)
+    const dateStr = formatDate(date)
+    const singles = singleMap.get(dateStr) || []
+    const durations = durationList.filter(s => dateStr >= s.startDate && dateStr <= s.endDate)
+
+    const shownDuration = durations.slice(0, MAX_BARS)
+    const shownSingle = singles.slice(0, MAX_SINGLES)
+    const rest = (durations.length - shownDuration.length) + (singles.length - shownSingle.length)
+
+    list.push({
+      dateStr,
+      day: date.getDate(),
+      inMonth: date.getMonth() === currentMonth.value,
+      isToday: dateStr === todayStr,
+      singles,
+      durations,
+      shownDuration,
+      shownSingle,
+      rest,
+      all: [...durations, ...singles]
+    })
+  }
+  return list
+})
+
+// 本月涉及多少条日程（持续日程只算一次）
+const monthCount = computed(() => {
+  const ids = new Set()
+  days.value.filter(d => d.inMonth).forEach(d => d.all.forEach(s => ids.add(s.id)))
+  return ids.size
+})
+
+function cellTitle(day) {
+  return day.all.map(s => `${s.title || '未命名日程'}${s.time ? ' · ' + s.time : ''}`).join('\n')
+}
+
+function handleDayClick(day) {
+  if (day.all.length) {
+    emit('day-click', { day: day.day, dateStr: day.dateStr, schedules: day.all })
+  }
+}
+
+// 右下角拖拽调整大小（带边界限制）
 const containerRef = ref(null)
 let isResizing = false
 let startX = 0, startY = 0, startWidth = 0, startHeight = 0
@@ -75,186 +144,226 @@ function stopResize() {
   document.removeEventListener('mousemove', onMouseMove)
   document.removeEventListener('mouseup', stopResize)
 }
-
-function handleDayClick(day) {
-  if (day.schedules && day.schedules.length) {
-    emit('day-click', day)
-  }
-}
-
-// 回到今天
-function goToToday() {
-  // 目前只有单月视图，后续支持翻月时可以在这里设置当前月份
-  alert('当前已经是本月视图，后续添加翻月功能后可一键跳转。')
-}
 </script>
 
 <template>
   <div ref="containerRef" class="calendar-container">
-    <div class="header">
-      <div class="header-left">
-        <span>{{ year }}年{{ month + 1 }}月</span>
-        <button class="today-btn" @click="goToToday">今天：{{ now.getMonth() + 1 }}月{{ now.getDate() }}日</button>
+    <header class="header">
+      <button class="today-btn" @click="goToday">今天</button>
+
+      <div class="nav">
+        <button class="nav-btn" aria-label="上一月" @click="prevMonth">‹</button>
+        <span class="title">{{ monthLabel }}</span>
+        <button class="nav-btn" aria-label="下一月" @click="nextMonth">›</button>
       </div>
-      
-      <div class="view-toggle">
-        <button :class="{ active: currentView === 'month' }" @click="currentView = 'month'">月</button>
-        <button :class="{ active: currentView === 'week' }" @click="currentView = 'week'">周</button>
-        <button :class="{ active: currentView === 'day' }" @click="currentView = 'day'">日</button>
-      </div>
-      <span class="hint">拖拽右下角调整大小</span>
-    </div>
-    
+
+      <span class="count">{{ monthCount }} 项日程</span>
+    </header>
+
     <div class="calendar-scroll-wrapper">
       <div class="calendar-grid">
         <div class="weekday-cell" v-for="w in weekDays" :key="w">{{ w }}</div>
-        
-        <div 
-          v-for="(day, index) in allDays" 
-          :key="index"
+
+        <div
+          v-for="day in days"
+          :key="day.dateStr"
           class="day-cell"
-          :class="{ 
-            'other-month': !day.day, 
-            'has-event': day.schedules.length > 0,
-            'is-important': day.schedules.some(s => s.isImportant),
-            'is-today': day.dateStr === todayStr
+          :class="{
+            other: !day.inMonth,
+            'is-today': day.isToday,
+            'has-event': day.all.length > 0
           }"
+          :title="cellTitle(day)"
           @click="handleDayClick(day)"
         >
-          <div class="day-header" v-if="day.day">{{ day.day }}</div>
-          
-          <!-- 精简信息：只显示标题，少量信息用省略号 -->
-          <div class="events-container" v-if="day.schedules.length">
-            <div 
-              v-for="s in day.schedules.filter(s => {
-                if (!s.isDuration) return true;
-                return s.startDate === day.dateStr || s.endDate === day.dateStr;
-              })" 
-              :key="'text-' + s.id" 
-              class="event-text"
-              :style="{ color: s.color }"
-              :title="`${s.title} ${s.time || ''} ${s.location || ''}`"
-              @click.stop="handleDayClick(day)"
+          <!-- 多日日程：顶部细横条 + 标题 -->
+          <div class="bars" v-if="day.shownDuration.length">
+            <div
+              v-for="s in day.shownDuration"
+              :key="'bar-' + s.id"
+              class="bar"
+              :class="{ mid: s.startDate !== day.dateStr && s.endDate !== day.dateStr }"
+              :style="{ backgroundColor: withAlpha(s.color, 0.16), color: darken(s.color) }"
             >
-              <span v-if="s.isImportant" class="badge">[重要]</span>
-              <span v-if="s.isDuration" class="duration-mark">{{ s.startDate === day.dateStr ? '【起】' : '【止】' }}</span>
-              <span class="event-title">{{ s.title }}</span>
+              <span class="bar-title">{{ s.title || '未命名日程' }}</span>
             </div>
           </div>
 
-          <!-- 底部线条区域 -->
-          <div class="lines-container" v-if="day.schedules.filter(s => s.isDuration).length">
-            <div v-for="s in day.schedules.filter(s => s.isDuration).slice().reverse()" :key="'line-' + s.id" class="line-wrapper">
-              <div 
-                class="event-line" 
+          <div class="day-number" :class="{ today: day.isToday }">{{ day.day }}</div>
+
+          <!-- 单日日程：圆点 + 标题 -->
+          <div class="singles" v-if="day.shownSingle.length">
+            <div
+              v-for="s in day.shownSingle"
+              :key="'ev-' + s.id"
+              class="event"
+              @click.stop="handleDayClick(day)"
+            >
+              <span
+                class="dot"
+                :class="{ important: s.isImportant }"
                 :style="{ backgroundColor: s.color || '#1677ff' }"
-                @click.stop="handleDayClick(day)"
-                title="点击查看持续日程详情"
-              ></div>
+              ></span>
+              <span class="event-title">{{ s.title || '未命名日程' }}</span>
             </div>
           </div>
+
+          <div v-if="day.rest > 0" class="more">+{{ day.rest }} 更多</div>
         </div>
       </div>
-      
-      <!-- 空状态引导 -->
-      <div v-if="!hasAnySchedule" class="empty-state">
-        <p>📭 本月暂无日程</p>
-        <p class="sub-hint">去左侧粘贴一条通知试试吧～</p>
+
+      <div v-if="!schedules.length" class="empty-state">
+        <p>本月还没有日程</p>
+        <p class="sub-hint">去左侧粘贴一条通知试试</p>
       </div>
     </div>
+
     <div class="resize-handle" @mousedown="startResize"></div>
   </div>
 </template>
 
 <style scoped>
 .calendar-container {
-  width: 100%; height: 600px; border: 1px solid #eceef1; border-radius: 12px;
-  background: #fff; padding: 14px; min-width: 320px; min-height: 300px;
-  box-sizing: border-box; position: relative; display: flex; flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  width: 100%; height: 600px; min-width: 320px; min-height: 300px;
+  box-sizing: border-box; position: relative;
+  display: flex; flex-direction: column;
+  background: #fff; padding: 16px 18px; border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
 }
 
-.header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #1f2328; flex-shrink: 0; }
-.header-left { display: flex; align-items: center; gap: 12px; }
+/* ---------- Header ---------- */
+.header {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; margin-bottom: 14px; flex-shrink: 0;
+}
 
 .today-btn {
-  font-size: 12px; padding: 5px 11px; background: #f2f7ff; color: #1677ff;
-  border: 1px solid #d6e6ff; border-radius: 8px; cursor: pointer; font-weight: normal;
+  justify-self: start;
+  padding: 6px 14px; font-size: 13px; font-weight: 500;
+  color: #57606a; background: #fff; border: 1px solid #eceef1; border-radius: 8px;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.today-btn:hover { background: #f4f4f5; color: #1f2328; }
+
+.nav { display: flex; align-items: center; gap: 4px; }
+
+.nav-btn {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; border-radius: 8px;
+  color: #8b949e; font-size: 17px; line-height: 1; cursor: pointer;
   transition: all 0.2s ease;
 }
-.today-btn:hover { background: #e8f2ff; border-color: #b3d4ff; box-shadow: 0 2px 8px rgba(22,119,255,0.12); }
+.nav-btn:hover { background: #f4f4f5; color: #1f2328; }
 
-.view-toggle { display: flex; gap: 4px; }
-.view-toggle button {
-  padding: 3px 10px; font-size: 12px; border: 1px solid #e6e9ed; background: #fff;
-  color: #57606a; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;
+.title {
+  min-width: 118px; text-align: center;
+  font-size: 16px; font-weight: 600; color: #1f2328; letter-spacing: 0.2px;
 }
-.view-toggle button:hover { background: #f2f4f7; color: #1f2328; }
-.view-toggle button.active { background: #1677ff; color: #fff; border-color: #1677ff; box-shadow: 0 2px 8px rgba(22,119,255,0.25); }
-.hint { font-size: 12px; color: #9aa4af; font-weight: normal; }
 
-.calendar-scroll-wrapper { flex: 1; overflow: auto; position: relative; border-radius: 10px; }
+.count { justify-self: end; font-size: 12px; color: #a1a8b3; }
+
+/* ---------- Grid ---------- */
+.calendar-scroll-wrapper { flex: 1; overflow: auto; position: relative; }
+
 .calendar-grid {
-  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-auto-rows: minmax(110px, 1fr); gap: 1px;
-  background-color: #f0f2f5; border: 1px solid #f0f2f5; border-radius: 10px;
-  overflow: hidden; width: 100%; min-height: 100%;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: minmax(84px, 1fr);
+  gap: 1px;
+  background: #f4f4f5;
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 100%;
 }
-.weekday-cell { background: #fafbfc; text-align: center; padding: 8px 0; font-size: 12px; color: #8b949e; font-weight: 600; }
+
+.weekday-cell {
+  background: #fff; text-align: center; padding: 5px 0 8px;
+  font-size: 11px; font-weight: 500; color: #a1a8b3;
+}
 
 .day-cell {
-  background: #fff; padding: 6px 4px 4px 4px; display: flex; flex-direction: column;
-  position: relative; cursor: pointer; transition: background 0.2s ease;
+  position: relative; background: #fff; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 5px 4px 4px;
+  cursor: pointer; transition: background 0.2s ease;
+  container-type: inline-size;
 }
-.day-cell:hover { background: #f8fafc; }
-.day-cell.other-month { background: #fdfdfe; cursor: default; }
-.day-cell.other-month .day-header { color: #d9dee5; }
+.day-cell:hover { background: #fafafa; }
+.day-cell.other .day-number { color: #ccc; }
+.day-cell.is-today { background: #f5f9ff; }
+.day-cell.is-today:hover { background: #eef5ff; }
 
-/* 核心：今天高亮 */
-.day-cell.is-today {
-  background: #f0f7ff;
-  border: 1px solid #1677ff;
-  box-shadow: inset 0 0 0 1px #1677ff;
+/* 多日日程：顶部细横条（内嵌标题） */
+.bars {
+  width: 100%; display: flex; flex-direction: column; gap: 2px;
+  margin-bottom: 2px;
 }
-.day-cell.is-today .day-header { color: #1677ff; font-weight: 700; }
-
-.day-cell.is-important { background: #fff8f8; border: 1px dashed #ffb3b0; }
-.day-cell.is-important.is-today { border: 2px solid #1677ff; background: #fff8f8; } /* 今天和重要同时存在时，蓝框优先 */
-
-.day-header { font-weight: 600; font-size: 12px; margin-bottom: 4px; color: #1f2328; }
-.events-container { flex-grow: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-
-/* 精简文字样式 */
-.event-text {
-  font-size: 11px; line-height: 1.3; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; padding: 1px 3px;
-  transition: transform 0.2s ease, background 0.2s ease; /* 悬停放大效果 */
-  border-radius: 4px;
+.bar {
+  height: 10px; margin: 0 2px; border-radius: 3px; overflow: hidden;
+  display: flex; align-items: center; transition: filter 0.2s ease;
 }
-.event-text:hover { transform: scale(1.05); background: #f2f4f7; z-index: 10; position: relative; }
+.bar.mid { margin: 0 -4px; border-radius: 0; }
+.bar:hover { filter: brightness(1.1); }
+.bar-title {
+  display: block; width: 100%; padding: 0 4px;
+  font-size: 8.5px; line-height: 10px; font-weight: 600; color: inherit;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
-.badge { color: #f5222d; font-weight: 600; margin-right: 2px; }
-.duration-mark { color: #9aa4af; font-size: 10px; margin-right: 2px; }
-.event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 100%; vertical-align: bottom; }
+/* 格子太窄、放不下文字时，只保留色条 */
+@container (max-width: 64px) {
+  .bar-title { display: none; }
+}
 
-.lines-container { margin-top: auto; display: flex; flex-direction: column-reverse; gap: 4px; width: 100%; padding-top: 4px; }
-.line-wrapper { display: flex; align-items: center; gap: 4px; width: 100%; }
-.event-line { flex: 1; height: 6px; border-radius: 3px; cursor: pointer; transition: all 0.2s ease; opacity: 0.85; }
-.event-line:hover { filter: brightness(1.15); opacity: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.18); transform: scaleY(1.2); }
+/* 日期数字 */
+.day-number {
+  width: 18px; height: 18px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #333; border-radius: 50%;
+  transition: all 0.2s ease;
+}
+.day-cell:hover .day-number:not(.today) { background: #f0f1f3; }
+.day-number.today {
+  background: #1677ff; color: #fff; font-weight: 600;
+  box-shadow: 0 2px 6px rgba(22, 119, 255, 0.35);
+}
 
-/* 空状态引导 */
+/* 单日日程：圆点 + 文字列表 */
+.singles {
+  width: 100%; display: flex; flex-direction: column; gap: 0;
+  margin-top: 2px; overflow: hidden;
+}
+.event {
+  display: flex; align-items: center; gap: 3px;
+  padding: 1px 3px; border-radius: 4px; width: 100%;
+  transition: background 0.15s ease;
+}
+.event:hover { background: #f3f4f6; }
+.dot {
+  width: 6px; height: 6px; border-radius: 50%; display: block; flex-shrink: 0;
+}
+.dot.important { box-shadow: 0 0 0 2px rgba(245, 34, 45, 0.18); }
+.event-title {
+  font-size: 9.5px; line-height: 1.3; color: #3f4650;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.more { font-size: 9px; color: #a1a8b3; line-height: 1.5; margin-top: 1px; }
+
+/* 空状态 */
 .empty-state {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  color: #9aa4af; pointer-events: none; /* 让鼠标穿透，不影响底层日历 */
+  color: #b3bac4; pointer-events: none;
 }
-.empty-state p { font-size: 16px; margin-bottom: 8px; }
-.empty-state .sub-hint { font-size: 13px; color: #c2c9d1; }
+.empty-state p { font-size: 15px; margin: 0 0 6px; }
+.empty-state .sub-hint { font-size: 13px; color: #c9cfd8; margin: 0; }
 
+/* 拖拽手柄 */
 .resize-handle {
-  position: absolute; bottom: 0; right: 0; width: 16px; height: 16px; cursor: nwse-resize;
-  background: linear-gradient(135deg, transparent 50%, #ccd2d9 50%); border-radius: 0 0 12px 0; z-index: 999;
-  transition: background 0.2s ease;
+  position: absolute; bottom: 0; right: 0; width: 16px; height: 16px;
+  cursor: nwse-resize; z-index: 10;
+  background: linear-gradient(135deg, transparent 50%, #e6e9ed 50%);
+  border-radius: 0 0 12px 0; transition: background 0.2s ease;
 }
-.resize-handle:hover { background: linear-gradient(135deg, transparent 50%, #9aa4af 50%); }
+.resize-handle:hover { background: linear-gradient(135deg, transparent 50%, #c2c9d1 50%); }
 </style>

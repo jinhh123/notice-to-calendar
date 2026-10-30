@@ -4,19 +4,27 @@ import { ref } from 'vue'
 const emit = defineEmits(['send'])
 const text = ref('')
 const messages = ref([])
+const isLoading = ref(false) // 请求进行中：禁用发送，防止狂点重复添加
+
+function setLoading(value) {
+  isLoading.value = !!value
+}
 
 // 供父组件调用，向消息区追加一条 AI 提示
 function addAiMessage(content) {
   messages.value.push({ role: 'ai', content })
 }
 
-defineExpose({ addAiMessage })
+defineExpose({ addAiMessage, setLoading })
 
 function handleSend() {
+  if (isLoading.value) return
   const t = text.value.trim()
   if (!t) return
   // 只添加用户消息
   messages.value.push({ role: 'user', content: t })
+  // 上锁，父组件处理完会调用 setLoading(false)
+  isLoading.value = true
   // 触发父组件发送
   emit('send', t)
   // 清空输入框，不添加任何假消息
@@ -40,7 +48,9 @@ function handleSend() {
         placeholder="粘贴通知文本…"
         rows="3"
       ></textarea>
-      <button @click="handleSend">发送</button>
+      <button :disabled="isLoading" @click="handleSend">
+        {{ isLoading ? '解析中…' : '发送' }}
+      </button>
     </div>
   </section>
 </template>
@@ -74,6 +84,7 @@ button {
   cursor: pointer; font-size: 13px; box-shadow: 0 2px 6px rgba(22,119,255,0.22);
   transition: all 0.2s ease;
 }
-button:hover { background: #0e5fd8; box-shadow: 0 4px 12px rgba(22,119,255,0.3); transform: translateY(-1px); }
-button:active { transform: translateY(0); }
+button:not(:disabled):hover { background: #0e5fd8; box-shadow: 0 4px 12px rgba(22,119,255,0.3); transform: translateY(-1px); }
+button:not(:disabled):active { transform: translateY(0); }
+button:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; transform: none; }
 </style>
