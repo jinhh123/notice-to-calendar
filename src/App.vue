@@ -204,68 +204,83 @@ const viewTitle = computed(() => {
       </div>
     </main>
 
-    <!-- 日程详情弹窗（优化提示） -->
+    <!-- 日程详情弹窗 -->
     <div class="modal-overlay" v-if="selectedDay" @click.self="closeModal">
       <div class="modal-content">
-        <h3>
-          {{ formatDayTitle(selectedDay) }}
-          <span v-if="selectedDay.schedules.some(s => s.isDuration)" class="duration-tip">
-            （含持续日程）
-          </span>
-        </h3>
+        <header class="modal-head">
+          <h3>{{ formatDayTitle(selectedDay) }}</h3>
+          <span v-if="selectedDay.schedules.some(s => s.isDuration)" class="duration-tip">含持续日程</span>
+          <button class="modal-close" aria-label="关闭" @click="closeModal">✕</button>
+        </header>
+
         <div class="detail-list">
-          <div v-for="s in selectedDay.schedules" :key="s.id" class="detail-item">
-            <div class="form-group">
-              <label>标题：</label>
-              <input v-model="s.title" @change="handleSave(s)" />
+          <section v-for="s in selectedDay.schedules" :key="s.id" class="detail-card">
+            <div class="field">
+              <label>标题</label>
+              <input v-model="s.title" placeholder="未命名日程" @change="handleSave(s)" />
             </div>
-            <div class="form-group">
-              <label>时间：</label>
-              <input v-model="s.time" @change="handleSave(s)" />
+            <div class="field">
+              <label>时间</label>
+              <input v-model="s.time" placeholder="如 10月15日下午2点" @change="handleSave(s)" />
             </div>
-            <div class="form-group">
-              <label>地点：</label>
-              <input v-model="s.location" @change="handleSave(s)" />
+            <div class="field">
+              <label>地点</label>
+              <input v-model="s.location" placeholder="未填写" @change="handleSave(s)" />
             </div>
-            <div class="form-group">
-              <label>单位：</label>
-              <input v-model="s.unit" @change="handleSave(s)" />
+            <div class="field">
+              <label>单位</label>
+              <input v-model="s.unit" placeholder="未填写" @change="handleSave(s)" />
             </div>
-            <div class="form-group">
-              <label>学分：</label>
-              <input v-model="s.credit" @change="handleSave(s)" />
+            <div class="field">
+              <label>学分</label>
+              <input v-model="s.credit" placeholder="未填写" @change="handleSave(s)" />
             </div>
-            <div class="form-group checkbox-group">
-              <label>
+
+            <div class="switch-row">
+              <span class="switch-label">重要日程</span>
+              <label class="switch">
                 <input type="checkbox" v-model="s.isImportant" @change="handleSave(s)" />
-                标记为重要日程（显示 ⚠️ 提醒）
+                <span class="switch-track"></span>
               </label>
             </div>
-            <div class="form-group checkbox-group">
-              <label>
+
+            <div class="switch-row">
+              <span class="switch-label">持续多天</span>
+              <label class="switch">
                 <input type="checkbox" v-model="s.isDuration" @change="handleSave(s)" />
-                标记为持续一段时间的日程
+                <span class="switch-track"></span>
               </label>
             </div>
-            <div v-if="s.isDuration" class="form-group date-range">
-              <label>开始日期：</label>
-              <input type="date" v-model="s.startDate" @change="handleSave(s)" />
-              <label>结束日期：</label>
-              <input type="date" v-model="s.endDate" @change="handleSave(s)" />
+
+            <div v-if="s.isDuration" class="range-row">
+              <div class="field">
+                <label>开始</label>
+                <input type="date" v-model="s.startDate" @change="handleSave(s)" />
+              </div>
+              <div class="field">
+                <label>结束</label>
+                <input type="date" v-model="s.endDate" @change="handleSave(s)" />
+              </div>
             </div>
-            <div class="form-group">
-              <label>日程颜色：</label>
+
+            <div class="field color-field">
+              <label>颜色</label>
               <input type="color" v-model="s.color" @change="handleSave(s)" />
               <span class="color-preview" :style="{ background: s.color }"></span>
             </div>
-            <details>
+
+            <details class="source">
               <summary>查看原文</summary>
               <pre>{{ s.source }}</pre>
             </details>
+
             <button class="delete-btn" @click="handleRemove(s.id)">删除此项</button>
-          </div>
+          </section>
         </div>
-        <button class="close-btn" @click="closeModal">关闭</button>
+
+        <footer class="modal-footer">
+          <button class="close-btn" @click="closeModal">关闭</button>
+        </footer>
       </div>
     </div>
   </div>
@@ -357,46 +372,141 @@ const viewTitle = computed(() => {
 
 /* 弹窗样式 */
 .modal-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(28,32,38,0.45);
+  position: fixed; inset: 0; background: rgba(28,32,38,0.45);
   display: flex; justify-content: center; align-items: center; z-index: 100;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px); padding: 16px;
 }
 .modal-content {
-  background: #fff; padding: 24px; border-radius: 16px; width: 90%; max-width: 600px;
-  max-height: 85vh; overflow-y: auto; border: 1px solid #eceef1;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.16);
+  background: #fff; border-radius: 18px; width: 100%; max-width: 520px;
+  max-height: 86vh; display: flex; flex-direction: column;
+  border: 1px solid #f0f1f3; box-shadow: 0 16px 48px rgba(0,0,0,0.18);
+  overflow: hidden;
 }
-.modal-content h3 { margin-top: 0; border-bottom: 1px solid #f0f2f5; padding-bottom: 12px; font-size: 17px; color: #1f2328; }
-.duration-tip { font-size: 12px; color: #d48806; font-weight: normal; margin-left: 6px; }
-.detail-item {
-  border: 1px solid #eceef1; padding: 16px; margin-bottom: 14px; border-radius: 12px;
-  background: #fbfcfd; position: relative; box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+
+/* 头部 */
+.modal-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 20px 20px 14px; flex-shrink: 0;
+  border-bottom: 1px solid #f0f0f0;
 }
-.form-group { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-.form-group label { width: 70px; font-size: 13px; color: #57606a; flex-shrink: 0; }
-.form-group input[type="text"], .form-group input[type="date"], .form-group input:not([type]) {
-  flex: 1; padding: 7px 10px; border: 1px solid #e6e9ed; border-radius: 8px; font-size: 13px;
-  color: #1f2328; background: #fff; outline: none; transition: all 0.2s ease;
+.modal-head h3 { margin: 0; font-size: 16px; font-weight: 600; color: #1f2328; }
+.duration-tip {
+  font-size: 11px; color: #d48806; background: #fffbe6;
+  padding: 2px 8px; border-radius: 999px;
 }
-.form-group input:focus { border-color: #91caff; box-shadow: 0 0 0 3px rgba(22,119,255,0.1); }
-.checkbox-group label { width: auto; display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.date-range input { flex: 1; }
-.color-preview { display: inline-block; width: 20px; height: 20px; border-radius: 50%; border: 1px solid #eceef1; margin-left: 8px; }
+.modal-close {
+  margin-left: auto; width: 30px; height: 30px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: #f4f5f7; border-radius: 50%;
+  color: #8f959e; font-size: 13px; cursor: pointer; transition: all 0.2s ease;
+}
+.modal-close:hover { background: #e9ebef; color: #3f4650; }
+
+/* 内容区 */
+.detail-list { padding: 16px 20px; overflow-y: auto; }
+.detail-card {
+  border: 1px solid #f0f1f3; border-radius: 12px; padding: 14px 14px 12px;
+  margin-bottom: 12px; background: #fff;
+}
+.detail-card:last-child { margin-bottom: 0; }
+
+/* 表单行：label 左、输入右 */
+.field { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.field label {
+  width: 44px; flex-shrink: 0;
+  font-size: 12px; color: #8f959e; letter-spacing: 0.2px;
+}
+.field input {
+  flex: 1; min-width: 0;
+  padding: 9px 12px; font-size: 13px; color: #1f2328; font-family: inherit;
+  background: #f4f5f7; border: 1px solid transparent; border-radius: 8px;
+  outline: none; transition: all 0.2s ease;
+}
+.field input::placeholder { color: #b6bcc4; }
+.field input:focus {
+  background: #fff; border-color: #91caff;
+  box-shadow: 0 0 0 3px rgba(22,119,255,0.12);
+}
+
+/* 颜色选择 */
+.color-field input[type="color"] {
+  flex: 0 0 auto; width: 52px; height: 34px; padding: 3px;
+  cursor: pointer; background: #f4f5f7; border-radius: 8px;
+}
+.color-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.color-field input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+.color-preview {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1px solid #eceef1; flex-shrink: 0;
+}
+
+/* 日期区间 */
+.range-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.range-row .field { display: block; margin-bottom: 0; }
+.range-row .field label { display: block; width: auto; margin-bottom: 4px; }
+
+/* 开关（替代原生 checkbox） */
+.switch-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 0;
+}
+.switch-label { font-size: 13px; color: #3f4650; }
+.switch { position: relative; display: inline-flex; flex-shrink: 0; }
+.switch input {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; margin: 0; cursor: pointer; z-index: 1;
+}
+.switch-track {
+  width: 42px; height: 24px; border-radius: 999px; background: #e3e6ea;
+  display: block; position: relative; transition: background 0.22s ease;
+}
+.switch-track::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.22s ease;
+}
+.switch input:checked + .switch-track { background: #1677ff; }
+.switch input:checked + .switch-track::after { transform: translateX(18px); }
+.switch input:focus-visible + .switch-track { box-shadow: 0 0 0 3px rgba(22,119,255,0.18); }
+
+/* 原文折叠 */
+.source { margin-top: 4px; }
+.source summary {
+  font-size: 12px; color: #8f959e; cursor: pointer; list-style: none;
+  padding: 4px 0; user-select: none;
+}
+.source summary::-webkit-details-marker { display: none; }
+.source summary::before { content: '▸ '; }
+.source[open] summary::before { content: '▾ '; }
 pre {
-  white-space: pre-wrap; font-size: 12px; color: #6b7684; background: #f7f8fa;
-  padding: 10px; border-radius: 8px; margin-top: 6px; border: 1px solid #f0f2f5;
+  white-space: pre-wrap; font-size: 12px; line-height: 1.6; color: #6b7684;
+  background: #f7f8fa; padding: 10px; border-radius: 8px; margin-top: 4px;
 }
+
+/* 按钮分层 */
 .delete-btn {
-  background: #fff; color: #f5222d; border: 1px solid #ffd8d6; padding: 6px 12px;
-  border-radius: 8px; cursor: pointer; font-size: 12px; transition: all 0.2s ease;
+  width: 100%; margin-top: 10px; padding: 9px;
+  background: #fff1f0; color: #f5222d; border: none; border-radius: 8px;
+  font-size: 12px; cursor: pointer; transition: all 0.2s ease;
 }
-.delete-btn:hover { background: #fff1f0; border-color: #ffa39e; box-shadow: 0 2px 8px rgba(245,34,45,0.12); }
+.delete-btn:hover { background: #ffe4e2; }
+/* 列表里的删除按钮保持小尺寸描边样式 */
+.list-item .delete-btn {
+  width: auto; margin-top: 0; padding: 6px 12px;
+  background: #fff; border: 1px solid #ffd8d6;
+}
+.list-item .delete-btn:hover { background: #fff1f0; border-color: #ffa39e; }
+
+.modal-footer {
+  padding: 14px 20px 18px; border-top: 1px solid #f0f0f0; flex-shrink: 0;
+}
 .close-btn {
-  width: 100%; padding: 12px; background: #1677ff; color: #fff; border: none;
-  border-radius: 10px; cursor: pointer; margin-top: 12px; font-size: 14px;
-  transition: all 0.2s ease;
+  width: 100%; padding: 12px; font-size: 14px;
+  background: #fff; color: #57606a; border: 1px solid #e6e9ed; border-radius: 10px;
+  cursor: pointer; transition: all 0.2s ease;
 }
-.close-btn:hover { background: #0e5fd8; box-shadow: 0 4px 12px rgba(22,119,255,0.28); }
+.close-btn:hover { background: #f7f8fa; border-color: #dfe3e8; color: #1f2328; }
+
 .important-badge { color: #f5222d; font-size: 12px; margin-right: 4px; }
 
 /* 移动端汉堡按钮：桌面端隐藏 */
