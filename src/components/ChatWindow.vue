@@ -46,19 +46,34 @@ function handleSend() {
 </template>
 
 <style scoped>
-.chat { 
-  background: #f9f9f9; 
-  border-radius: 8px; 
-  padding: 12px; 
-  margin-bottom: 0; /* 改成 0 */
-  border: 1px solid #eee;
+.chat {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 0;
+  border: 1px solid #eceef1;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
-.messages { min-height: 120px; margin-bottom: 8px; }
-.bubble { padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; max-width: 80%; }
-.bubble.user { background: #d1e7ff; margin-left: auto; }
-.bubble.ai { background: #eee; }
-.hint { color: #999; font-size: 13px; }
-.input-row { display: flex; gap: 8px; }
-textarea { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; resize: none; font-family: inherit; }
-button { padding: 8px 16px; background: #1677ff; color: #fff; border: none; border-radius: 6px; }
+.messages { min-height: 120px; max-height: 220px; overflow-y: auto; margin-bottom: 10px; }
+.bubble {
+  padding: 8px 12px; border-radius: 10px; margin-bottom: 6px; max-width: 80%;
+  font-size: 13px; line-height: 1.5; word-break: break-word; transition: all 0.2s ease;
+}
+.bubble.user { background: #e8f2ff; color: #1f2328; margin-left: auto; }
+.bubble.ai { background: #f5f6f8; color: #1f2328; border: 1px solid #eceef1; }
+.hint { color: #9aa4af; font-size: 13px; }
+.input-row { display: flex; gap: 8px; align-items: flex-end; }
+textarea {
+  flex: 1; padding: 9px 10px; border: 1px solid #e6e9ed; border-radius: 10px;
+  resize: none; font-family: inherit; font-size: 13px; color: #1f2328; background: #fbfcfd;
+  outline: none; transition: all 0.2s ease;
+}
+textarea:focus { border-color: #91caff; background: #fff; box-shadow: 0 0 0 3px rgba(22,119,255,0.1); }
+button {
+  padding: 9px 18px; background: #1677ff; color: #fff; border: none; border-radius: 10px;
+  cursor: pointer; font-size: 13px; box-shadow: 0 2px 6px rgba(22,119,255,0.22);
+  transition: all 0.2s ease;
+}
+button:hover { background: #0e5fd8; box-shadow: 0 4px 12px rgba(22,119,255,0.3); transform: translateY(-1px); }
+button:active { transform: translateY(0); }
 </style>

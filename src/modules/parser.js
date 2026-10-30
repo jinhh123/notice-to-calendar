@@ -21,22 +21,15 @@ function fixDateYear(dateStr) {
 
 export async function parseText(text) {
   try {
-    const currentYear = new Date().getFullYear()
-
-    // 构造给 DeepSeek 的提示词（明确告知当前年份）
-    const systemPrompt = `你是一个校园通知信息提取助手。当前年份是 ${currentYear}年。从用户提供的通知文本中提取以下字段，返回 JSON：
-- title: 日程标题（如"关于XX的通知"），没有则填"未命名日程"
-- time: 时间描述（如"10月15日14点"），如果是持续日程则留空
-- location: 地点
-- items: 需要携带的物品数组（如 ["学生证", "笔记本"]）
-- unit: 发布单位
-- credit: 学分（字符串或数字）
-- isImportant: 是否紧急/重要（布尔值 true/false）
-- isDuration: 是否为持续多天日程（布尔值 true/false）
-- startDate: 开始日期（必须用 YYYY-MM-DD 格式，且年份必须是 ${currentYear}）
-- endDate: 结束日期（必须用 YYYY-MM-DD 格式，且年份必须是 ${currentYear}）
-
-只返回 JSON，不要任何其他文字。如果某字段不存在，填空字符串或空数组。`
+    // 构造给 DeepSeek 的提示词
+    const systemPrompt = `你是一个校园通知提取助手。请提取文本信息并返回严格的 JSON。
+注意：
+- title：提取核心事件或动作（例如"看眼睛"、"开会"），绝不能填"未命名日程"。
+- time：提取时间描述（如"明天"）。
+- isDuration：如果是持续多天的日程才设为 true。
+- startDate/endDate：如果不是明确的持续多天日程，这两个字段必须填空字符串 ""，绝对禁止自行编造日期（如 2026-01-01）。
+- items, unit, credit, location：如果没有就填空字符串或空数组。
+只返回 JSON，不要其他文字。`
 
     const response = await fetch('/api/deepseek', {
       method: 'POST',
@@ -135,7 +128,14 @@ function localFallbackParse(text) {
     result.endDate = `${currentYear}-${endM}-${endD}`
     result.time = `${durationMatch[1]}月${durationMatch[2]}日-${endM}月${endD}日`
   } else {
-    const timePatterns = [/(\d{1,2}月\d{1,2}日[^\s，,。；;]*)/, /(明天[^\s，,。；;]*)/, /(今天[^\s，,。；;]*)/, /(\d{1,2}[:：]\d{2})/]
+    const timePatterns = [
+      /(\d{1,2}月\d{1,2}日[^\s，,。；;]*)/,
+      /((?:下下|下|这|本)?\s*(?:周|星期|礼拜)[一二三四五六日天1-7][^\s，,。；;]*)/,
+      /(\d{1,2}\s*天(?:之?后|以后)[^\s，,。；;]*)/,
+      /(明天[^\s，,。；;]*)/,
+      /(今天[^\s，,。；;]*)/,
+      /(\d{1,2}[:：]\d{2})/
+    ]
     for (const p of timePatterns) {
       const m = text.match(p)
       if (m) { result.time = m[1]; break }
@@ -164,13 +164,60 @@ function localFallbackParse(text) {
 const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
-// 按北京时间拼出 YYYY-MM-DD，不受运行环境时区影响
-function toBeijingDateString(date = new Date()) {
-  const shifted = new Date(date.getTime() + BEIJING_OFFSET_MS)
-  const y = shifted.getUTCFullYear()
-  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0')
-  const d = String(shifted.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+// 北京时间的“天序号”（1970-01-01 起的天数），与运行环境时区无关
+function beijingDayNumber(date = new Date()) {
+  return Math.floor((date.getTime() + BEIJING_OFFSET_MS) / ONE_DAY_MS)
+}
+
+// 天序号转 YYYY-MM-DD
+function dayNumberToString(dayNumber) {
+  const d = new Date(dayNumber * ONE_DAY_MS)
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// 天序号对应的星期几（周一=1 … 周日=7）
+function weekdayOfDayNumber(dayNumber) {
+  const dow = new Date(dayNumber * ONE_DAY_MS).getUTCDay()
+  return dow === 0 ? 7 : dow
+}
+
+const WEEKDAY_CHAR = {
+  一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 7, 天: 7,
+  1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7
+}
+
+// 解析相对时间，返回天序号；无法解析返回 null
+// 支持：今天/明天/后天/大后天、周三/本周三/下周三/下下周三、N天后
+function resolveRelativeDay(timeStr, now = new Date()) {
+  const today = beijingDayNumber(now)
+
+  // 周几
+  const weekMatch = timeStr.match(/(下下|下|这|本)?\s*(?:周|星期|礼拜)\s*([一二三四五六日天1-7])/)
+  if (weekMatch) {
+    const prefix = weekMatch[1] || ''
+    const target = WEEKDAY_CHAR[weekMatch[2]]
+    const base = weekdayOfDayNumber(today)
+    let delta
+    if (prefix === '下') delta = 7 - base + target // 下周的周 X
+    else if (prefix === '下下') delta = 14 - base + target // 下下周的周 X
+    else if (prefix === '这' || prefix === '本') delta = target - base // 本周，可能已过去
+    else delta = (target - base + 7) % 7 // 裸「周三」取最近的一次（含今天）
+    return today + delta
+  }
+
+  // N 天后 / N 天以后
+  const afterMatch = timeStr.match(/(\d{1,2})\s*天(?:之?后|以后)/)
+  if (afterMatch) return today + Number(afterMatch[1])
+
+  if (timeStr.includes('大后天')) return today + 3
+  if (timeStr.includes('后天')) return today + 2
+  if (timeStr.includes('明天') || timeStr.includes('明日')) return today + 1
+  if (timeStr.includes('今天') || timeStr.includes('今日')) return today
+
+  return null
 }
 
 // 日期规范化（日历组件依赖此函数）
@@ -178,19 +225,18 @@ export function normalizeDate(timeStr) {
   if (!timeStr) return ''
   const now = new Date()
 
+  // 明确的「X月X日」优先
   const mdMatch = timeStr.match(/(\d{1,2})月(\d{1,2})日/)
   if (mdMatch) {
-    const currentYear = toBeijingDateString(now).slice(0, 4)
+    const currentYear = dayNumberToString(beijingDayNumber(now)).slice(0, 4)
     const month = mdMatch[1].padStart(2, '0')
     const day = mdMatch[2].padStart(2, '0')
     return `${currentYear}-${month}-${day}`
   }
-  if (timeStr.includes('明天')) {
-    // 先按毫秒加一天，再折算北京时间（中国无夏令时，24h 恒等一天）
-    return toBeijingDateString(new Date(now.getTime() + ONE_DAY_MS))
-  }
-  if (timeStr.includes('今天')) {
-    return toBeijingDateString(now)
-  }
+
+  // 相对时间：今天 / 明天 / 周三 / 下周三 / 3天后 …
+  const relativeDay = resolveRelativeDay(timeStr, now)
+  if (relativeDay !== null) return dayNumberToString(relativeDay)
+
   return ''
 }

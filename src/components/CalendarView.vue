@@ -168,81 +168,93 @@ function goToToday() {
 
 <style scoped>
 .calendar-container {
-  width: 100%; height: 600px; border: 1px solid #e0e0e0; border-radius: 8px;
-  background: #fff; padding: 12px; min-width: 320px; min-height: 300px;
+  width: 100%; height: 600px; border: 1px solid #eceef1; border-radius: 12px;
+  background: #fff; padding: 14px; min-width: 320px; min-height: 300px;
   box-sizing: border-box; position: relative; display: flex; flex-direction: column;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
-.header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: bold; margin-bottom: 12px; color: #333; flex-shrink: 0; }
+.header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #1f2328; flex-shrink: 0; }
 .header-left { display: flex; align-items: center; gap: 12px; }
 
 .today-btn {
-  font-size: 12px; padding: 4px 10px; background: #e6f7ff; color: #1677ff;
-  border: 1px solid #91d5ff; border-radius: 6px; cursor: pointer; font-weight: normal;
+  font-size: 12px; padding: 5px 11px; background: #f2f7ff; color: #1677ff;
+  border: 1px solid #d6e6ff; border-radius: 8px; cursor: pointer; font-weight: normal;
+  transition: all 0.2s ease;
 }
-.today-btn:hover { background: #bae7ff; }
+.today-btn:hover { background: #e8f2ff; border-color: #b3d4ff; box-shadow: 0 2px 8px rgba(22,119,255,0.12); }
 
 .view-toggle { display: flex; gap: 4px; }
-.view-toggle button { padding: 2px 8px; font-size: 12px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; }
-.view-toggle button.active { background: #1677ff; color: #fff; border-color: #1677ff; }
-.hint { font-size: 12px; color: #999; font-weight: normal; }
+.view-toggle button {
+  padding: 3px 10px; font-size: 12px; border: 1px solid #e6e9ed; background: #fff;
+  color: #57606a; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;
+}
+.view-toggle button:hover { background: #f2f4f7; color: #1f2328; }
+.view-toggle button.active { background: #1677ff; color: #fff; border-color: #1677ff; box-shadow: 0 2px 8px rgba(22,119,255,0.25); }
+.hint { font-size: 12px; color: #9aa4af; font-weight: normal; }
 
-.calendar-scroll-wrapper { flex: 1; overflow: auto; position: relative; }
+.calendar-scroll-wrapper { flex: 1; overflow: auto; position: relative; border-radius: 10px; }
 .calendar-grid {
   display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-auto-rows: minmax(110px, 1fr); gap: 1px;
-  background-color: #f0f0f0; border: 1px solid #f0f0f0; width: 100%; min-height: 100%;
+  background-color: #f0f2f5; border: 1px solid #f0f2f5; border-radius: 10px;
+  overflow: hidden; width: 100%; min-height: 100%;
 }
-.weekday-cell { background: #fafafa; text-align: center; padding: 8px 0; font-size: 12px; color: #888; font-weight: bold; }
+.weekday-cell { background: #fafbfc; text-align: center; padding: 8px 0; font-size: 12px; color: #8b949e; font-weight: 600; }
 
-.day-cell { background: #fff; padding: 6px 4px 4px 4px; display: flex; flex-direction: column; position: relative; cursor: pointer; transition: background 0.2s; }
-.day-cell:hover { background: #f9f9f9; }
-.day-cell.other-month { background: #fdfdfd; cursor: default; }
-.day-cell.other-month .day-header { color: #ddd; }
+.day-cell {
+  background: #fff; padding: 6px 4px 4px 4px; display: flex; flex-direction: column;
+  position: relative; cursor: pointer; transition: background 0.2s ease;
+}
+.day-cell:hover { background: #f8fafc; }
+.day-cell.other-month { background: #fdfdfe; cursor: default; }
+.day-cell.other-month .day-header { color: #d9dee5; }
 
 /* 核心：今天高亮 */
 .day-cell.is-today {
-  background: #e6f7ff;
+  background: #f0f7ff;
   border: 1px solid #1677ff;
   box-shadow: inset 0 0 0 1px #1677ff;
 }
-.day-cell.is-today .day-header { color: #1677ff; font-weight: bold; }
+.day-cell.is-today .day-header { color: #1677ff; font-weight: 700; }
 
-.day-cell.is-important { background: #fff1f0; border: 1px dashed #ff4d4f; }
-.day-cell.is-important.is-today { border: 2px solid #1677ff; background: #fff1f0; } /* 今天和重要同时存在时，蓝框优先 */
+.day-cell.is-important { background: #fff8f8; border: 1px dashed #ffb3b0; }
+.day-cell.is-important.is-today { border: 2px solid #1677ff; background: #fff8f8; } /* 今天和重要同时存在时，蓝框优先 */
 
-.day-header { font-weight: bold; font-size: 12px; margin-bottom: 4px; color: #333; }
+.day-header { font-weight: 600; font-size: 12px; margin-bottom: 4px; color: #1f2328; }
 .events-container { flex-grow: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
 
 /* 精简文字样式 */
-.event-text { 
-  font-size: 11px; line-height: 1.3; white-space: nowrap; 
-  overflow: hidden; text-overflow: ellipsis; padding: 1px 2px;
-  transition: transform 0.2s, background 0.2s; /* 悬停放大效果 */
-  border-radius: 3px;
+.event-text {
+  font-size: 11px; line-height: 1.3; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; padding: 1px 3px;
+  transition: transform 0.2s ease, background 0.2s ease; /* 悬停放大效果 */
+  border-radius: 4px;
 }
-.event-text:hover { transform: scale(1.05); background: #f0f0f0; z-index: 10; position: relative; }
+.event-text:hover { transform: scale(1.05); background: #f2f4f7; z-index: 10; position: relative; }
 
-.badge { color: #ff4d4f; font-weight: bold; margin-right: 2px; }
-.duration-mark { color: #888; font-size: 10px; margin-right: 2px; }
+.badge { color: #f5222d; font-weight: 600; margin-right: 2px; }
+.duration-mark { color: #9aa4af; font-size: 10px; margin-right: 2px; }
 .event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 100%; vertical-align: bottom; }
 
 .lines-container { margin-top: auto; display: flex; flex-direction: column-reverse; gap: 4px; width: 100%; padding-top: 4px; }
 .line-wrapper { display: flex; align-items: center; gap: 4px; width: 100%; }
-.event-line { flex: 1; height: 6px; border-radius: 3px; cursor: pointer; transition: filter 0.2s; }
-.event-line:hover { filter: brightness(1.2); box-shadow: 0 0 4px rgba(0,0,0,0.3); }
+.event-line { flex: 1; height: 6px; border-radius: 3px; cursor: pointer; transition: all 0.2s ease; opacity: 0.85; }
+.event-line:hover { filter: brightness(1.15); opacity: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.18); transform: scaleY(1.2); }
 
 /* 空状态引导 */
 .empty-state {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  color: #999; pointer-events: none; /* 让鼠标穿透，不影响底层日历 */
+  color: #9aa4af; pointer-events: none; /* 让鼠标穿透，不影响底层日历 */
 }
 .empty-state p { font-size: 16px; margin-bottom: 8px; }
-.empty-state .sub-hint { font-size: 13px; color: #bbb; }
+.empty-state .sub-hint { font-size: 13px; color: #c2c9d1; }
 
 .resize-handle {
   position: absolute; bottom: 0; right: 0; width: 16px; height: 16px; cursor: nwse-resize;
-  background: linear-gradient(135deg, transparent 50%, #999 50%); border-radius: 0 0 8px 0; z-index: 999;
+  background: linear-gradient(135deg, transparent 50%, #ccd2d9 50%); border-radius: 0 0 12px 0; z-index: 999;
+  transition: background 0.2s ease;
 }
+.resize-handle:hover { background: linear-gradient(135deg, transparent 50%, #9aa4af 50%); }
 </style>
