@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import ChatWindow from './components/ChatWindow.vue'
 import CalendarView from './components/CalendarView.vue'
 import TimelineView from './components/TimelineView.vue'
@@ -159,6 +159,21 @@ function switchView(view) {
   currentView.value = view
   drawerOpen.value = false
 }
+
+// 弹窗打开期间锁定 body 滚动，避免背景日历跟着手指滑动
+let bodyOverflowBackup = ''
+watch(selectedDay, (open) => {
+  if (open) {
+    bodyOverflowBackup = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = bodyOverflowBackup
+  }
+})
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = bodyOverflowBackup
+})
 
 // 弹窗标题：优先用 dateStr 拼出「11月2日」，避免跨月歧义
 function formatDayTitle(day) {
@@ -572,7 +587,11 @@ pre {
 
 /* ================= 移动端适配 ================= */
 @media (max-width: 768px) {
-  .app-layout { flex-direction: column; height: 100dvh; }
+  .app-layout {
+    flex-direction: column; height: 100dvh;
+    /* iOS 刘海屏：让内容避开状态栏 */
+    padding-top: env(safe-area-inset-top);
+  }
 
   /* 遮罩 */
   .drawer-mask {
@@ -583,17 +602,26 @@ pre {
   /* 侧边栏改为抽屉：默认移出屏幕，展开时滑入 */
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
-    width: 82vw; max-width: 320px; padding: 16px;
+    width: 82vw; max-width: 320px;
+    /* 抽屉是 fixed 定位，不吃 .app-layout 的 padding，需要自己让开刘海和 Home 条 */
+    padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
     transform: translateX(-100%);
     transition: transform 0.28s ease;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
   }
-  .sidebar.collapsed { width: 82vw; padding: 16px; }
+  .sidebar.collapsed {
+    width: 82vw;
+    padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  }
   .sidebar.drawer-open { transform: translateX(0); }
   .collapse-btn { display: none; }
 
   /* 主内容区 */
-  .main-content { padding: 12px; min-width: 0; overflow-x: hidden; }
+  .main-content {
+    padding: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    min-width: 0; overflow-x: hidden;
+  }
   .main-header { flex-wrap: wrap; row-gap: 8px; gap: 8px; margin-bottom: 12px; }
   .menu-btn { display: flex; }
   .main-header h1 {
