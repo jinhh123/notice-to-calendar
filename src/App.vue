@@ -275,6 +275,7 @@ const viewTitle = computed(() => {
 .app-layout {
   display: flex; height: 100vh; background: #f9fafb;
   font-family: -apple-system, "PingFang SC", sans-serif; color: #1f2328;
+  width: 100%; max-width: 100%; overflow-x: hidden; box-sizing: border-box;
 }
 
 /* 侧边栏样式（支持折叠） */
@@ -303,18 +304,24 @@ const viewTitle = computed(() => {
 .sidebar-bottom { margin-top: auto; }
 
 /* 主内容区样式 */
-.main-content { flex: 1; display: flex; flex-direction: column; padding: 24px; overflow: hidden; background: #f9fafb; }
+.main-content {
+  flex: 1; display: flex; flex-direction: column; padding: 24px;
+  overflow: hidden; background: #f9fafb;
+  width: 100%; max-width: 100%; min-width: 0;
+  overflow-x: hidden; box-sizing: border-box;
+}
 .main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
 .main-header h1 { font-size: 20px; font-weight: 650; color: #1f2328; margin: 0; }
 .export {
   background: #52c41a; color: #fff; border: none; padding: 9px 18px; border-radius: 10px;
   cursor: pointer; font-size: 14px; box-shadow: 0 2px 6px rgba(82,196,26,0.25);
   transition: all 0.2s ease;
+  white-space: nowrap; flex: 0 1 auto; min-width: 0; max-width: 100%;
 }
 .export:hover { background: #46a816; box-shadow: 0 4px 12px rgba(82,196,26,0.32); transform: translateY(-1px); }
 .export:active { transform: translateY(0); }
 
-.actions { display: flex; gap: 8px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .export.ghost {
   background: #fff; color: #1677ff; border: 1px solid #d6e6ff;
   box-shadow: 0 2px 6px rgba(22,119,255,0.12);

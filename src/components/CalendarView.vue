@@ -224,11 +224,12 @@ function stopResize() {
 
 <style scoped>
 .calendar-container {
-  width: 100%; height: 600px; min-width: 320px; min-height: 300px;
+  width: 100%; max-width: 100%; height: 600px; min-width: 0; min-height: 300px;
   box-sizing: border-box; position: relative;
   display: flex; flex-direction: column;
   background: #fff; padding: 16px 18px; border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  overflow: hidden;
 }
 
 /* ---------- Header ---------- */
@@ -274,6 +275,7 @@ function stopResize() {
   border-radius: 10px;
   overflow: hidden;
   min-height: 100%;
+  width: 100%; min-width: 0; max-width: 100%;
 }
 
 .weekday-cell {
@@ -287,6 +289,7 @@ function stopResize() {
   padding: 5px 4px 4px;
   cursor: pointer; transition: background 0.2s ease;
   container-type: inline-size;
+  min-width: 0; max-width: 100%;
 }
 .day-cell:hover { background: #fafafa; }
 .day-cell.other .day-number { color: #ccc; }
@@ -295,7 +298,7 @@ function stopResize() {
 
 /* 多日日程：顶部细横条（内嵌标题） */
 .bars {
-  width: 100%; display: flex; flex-direction: column; gap: 2px;
+  width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 2px;
   margin-bottom: 2px;
 }
 .bar {
@@ -330,12 +333,12 @@ function stopResize() {
 
 /* 单日日程：圆点 + 文字列表 */
 .singles {
-  width: 100%; display: flex; flex-direction: column; gap: 0;
+  width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 0;
   margin-top: 2px; overflow: hidden;
 }
 .event {
   display: flex; align-items: center; gap: 3px;
-  padding: 1px 3px; border-radius: 4px; width: 100%;
+  padding: 1px 3px; border-radius: 4px; width: 100%; min-width: 0;
   transition: background 0.15s ease;
 }
 .event:hover { background: #f3f4f6; }
@@ -375,8 +378,8 @@ function stopResize() {
   }
   .resize-handle { display: none; } /* 触屏拖拽体验差，直接关掉 */
 
-  .header { margin-bottom: 8px; }
-  .title { min-width: 96px; font-size: 14px; }
+  .header { margin-bottom: 8px; min-width: 0; }
+  .title { min-width: 0; font-size: 14px; }
   .today-btn { padding: 5px 10px; font-size: 12px; }
   .nav-btn { width: 26px; height: 26px; font-size: 15px; }
   .count { display: none; } /* 标题栏太窄，隐藏统计 */
