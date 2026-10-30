@@ -38,7 +38,7 @@ export async function parseText(text) {
 
 只返回 JSON，不要任何其他文字。如果某字段不存在，填空字符串或空数组。`
 
-    const response = await fetch('/api/deepseek/chat/completions', {
+    const response = await fetch('/api/deepseek', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -51,6 +51,8 @@ export async function parseText(text) {
         temperature: 0.1
       })
     })
+
+    if (!response.ok) throw new Error(`接口返回 ${response.status}`)
 
     const data = await response.json()
     if (!data.choices || !data.choices[0]) throw new Error('AI 返回数据格式错误')
@@ -70,11 +72,16 @@ export async function parseText(text) {
     if (!result.time) result.time = ''
 
     // 如果 AI 漏填了起止日期，但提取了时间，尝试用本地逻辑补充
+    // 注意：localFallbackParse 现在会抛错，这里必须单独兜住，避免把 AI 的有效结果一起丢掉
     if (result.isDuration && (!result.startDate || !result.endDate)) {
-      const localCheck = localFallbackParse(text)
-      if (localCheck.isDuration) {
-        result.startDate = localCheck.startDate
-        result.endDate = localCheck.endDate
+      try {
+        const localCheck = localFallbackParse(text)
+        if (localCheck.isDuration) {
+          result.startDate = localCheck.startDate
+          result.endDate = localCheck.endDate
+        }
+      } catch (e) {
+        // 本地也判断不出日期，保留 AI 的原始结果
       }
     }
 
@@ -85,8 +92,30 @@ export async function parseText(text) {
   }
 }
 
+// 明确日期：10月15日 / 10-15 / 2026-10-15
+const DATE_RE = /(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[-/]\d{1,2}/
+// 明确的活动动作词
+const ACTION_WORDS = [
+  '开会', '会议', '例会', '班会', '活动', '讲座', '报告', '宣讲', '座谈', '研讨',
+  '培训', '课程', '上课', '实验', '考试', '答辩', '面试', '招聘', '比赛', '竞赛',
+  '报名', '签到', '缴费', '领取', '体检', '演出', '晚会', '展览', '典礼', '仪式',
+  '提交', '截止', '投稿', '实习', '实践'
+]
+
+function hasScheduleSignal(text) {
+  if (DATE_RE.test(text)) return true
+  return ACTION_WORDS.some(w => text.includes(w))
+}
+
 // 本地正则解析（备用方案）
 function localFallbackParse(text) {
+  const normalized = String(text || '')
+
+  // 兜底门槛：既没有日期也没有动作词，直接判定为无效文本
+  if (!hasScheduleSignal(normalized)) {
+    throw new Error('文本中未检测到有效日程')
+  }
+
   const now = new Date()
   const currentYear = now.getFullYear()
   const result = {
@@ -131,25 +160,37 @@ function localFallbackParse(text) {
   return result
 }
 
+// 中国无夏令时，固定 UTC+8
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+// 按北京时间拼出 YYYY-MM-DD，不受运行环境时区影响
+function toBeijingDateString(date = new Date()) {
+  const shifted = new Date(date.getTime() + BEIJING_OFFSET_MS)
+  const y = shifted.getUTCFullYear()
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(shifted.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 // 日期规范化（日历组件依赖此函数）
 export function normalizeDate(timeStr) {
   if (!timeStr) return ''
   const now = new Date()
-  const currentYear = now.getFullYear()
-  
+
   const mdMatch = timeStr.match(/(\d{1,2})月(\d{1,2})日/)
   if (mdMatch) {
+    const currentYear = toBeijingDateString(now).slice(0, 4)
     const month = mdMatch[1].padStart(2, '0')
     const day = mdMatch[2].padStart(2, '0')
     return `${currentYear}-${month}-${day}`
   }
   if (timeStr.includes('明天')) {
-    const tomorrow = new Date(now)
-    tomorrow.setDate(now.getDate() + 1)
-    return tomorrow.toISOString().split('T')[0]
+    // 先按毫秒加一天，再折算北京时间（中国无夏令时，24h 恒等一天）
+    return toBeijingDateString(new Date(now.getTime() + ONE_DAY_MS))
   }
   if (timeStr.includes('今天')) {
-    return now.toISOString().split('T')[0]
+    return toBeijingDateString(now)
   }
   return ''
 }

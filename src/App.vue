@@ -18,20 +18,20 @@ async function handleSend(text) {
     // 调用 AI 解析
     const parsed = await parseText(text)
 
-    // 失败拦截：既没有时间描述，也没有起始日期，视为无效日程
-    if (!parsed.time && !parsed.startDate) {
-      chatWindowRef.value?.addAiMessage('❌ 未识别到有效的时间信息，请补充具体的日期或时间。')
-      return // 不写入存储，直接终止
+    // 失败拦截：没有结果，或既没有时间也没有起始日期，一律视为无效
+    if (!parsed || (!parsed.time && !parsed.startDate)) {
+      throw new Error('未识别到有效的时间信息')
     }
 
-    // 存入本地
+    // 只有通过校验才写入存储
     schedules.value = addSchedule(parsed)
 
     // 成功反馈
     chatWindowRef.value?.addAiMessage('✅ 已添加：' + parsed.title)
   } catch (err) {
+    // 解析异常 / 文本无效，统一拦在这里：只提示，绝不落库
     console.error('解析失败:', err)
-    chatWindowRef.value?.addAiMessage('❌ AI 解析失败了，请检查网络或 API 额度。')
+    chatWindowRef.value?.addAiMessage('❌ 未识别到有效的时间信息，请补充具体的日期或时间。')
   }
 }
 function handleRemove(id) {
