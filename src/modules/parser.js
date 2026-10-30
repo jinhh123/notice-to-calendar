@@ -7,6 +7,21 @@ function getRandomColor() {
   return colors[Math.floor(Math.random() * colors.length)]
 }
 
+// AI 请求超时：超过这个时间直接中断，走本地正则，避免弱网下无限等待
+// 8000ms：实测 DeepSeek 首字延迟常见 2~6s，3s 会导致几乎每次都降级
+const AI_TIMEOUT_MS = 8000
+
+// 带超时的 fetch：用 AbortController 在超时后主动中断
+async function fetchWithTimeout(url, options, timeout = AI_TIMEOUT_MS) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeout)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // 修正 AI 可能提取错的年份（按北京时间的年份）
 function fixDateYear(dateStr) {
   if (!dateStr) return ''
@@ -31,7 +46,7 @@ export async function parseText(text) {
 - items, unit, credit, location：如果没有就填空字符串或空数组。
 只返回 JSON，不要其他文字。`
 
-    const response = await fetch('/api/deepseek', {
+    const response = await fetchWithTimeout('/api/deepseek', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -43,7 +58,7 @@ export async function parseText(text) {
         response_format: { type: 'json_object' },
         temperature: 0.1
       })
-    })
+    }, AI_TIMEOUT_MS)
 
     if (!response.ok) throw new Error(`接口返回 ${response.status}`)
 
@@ -78,10 +93,14 @@ export async function parseText(text) {
       }
     }
 
+    // 正常走 AI 解析
+    result.isFallback = false
     return result
   } catch (err) {
-    console.warn('AI 解析失败，已降级使用本地正则:', err.message)
-    return localFallbackParse(text)
+    const reason = err.name === 'AbortError' ? `请求超时 ${AI_TIMEOUT_MS}ms` : err.message
+    console.warn('AI 解析失败，已降级使用本地正则:', reason)
+    // 标记为降级结果，前端可据此提示「网络延迟，已启用本地极速解析」
+    return { ...localFallbackParse(text), isFallback: true }
   }
 }
 

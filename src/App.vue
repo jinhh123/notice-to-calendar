@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import ChatWindow from './components/ChatWindow.vue'
 import CalendarView from './components/CalendarView.vue'
 import TimelineView from './components/TimelineView.vue'
-import { parseText } from './modules/parser'
+import { parseText, normalizeDate } from './modules/parser'
 import { loadSchedules, addSchedule, removeSchedule, updateSchedule } from './modules/storage'
 // 注意：这里假设你已经把 ics.js 改成了 exporter.js 并实现了图片导出。如果还没改，这行会报错，请告诉我。
 import { exportToImage } from './modules/exporter'
@@ -14,8 +14,25 @@ const selectedDay = ref(null)
 const currentView = ref('calendar')
 const sidebarCollapsed = ref(false) // 新增：控制侧边栏折叠
 const chatWindowRef = ref(null) // 新增：用于向聊天窗口回写提示消息
+const isParsing = ref(false) // 解析中：防重复提交
+
+// 日程的日期键：持续日程取 startDate，单日日程从 time 归一化
+function dateKey(s) {
+  return s.startDate || normalizeDate(s.time) || ''
+}
+
+// 去重：标题 + 日期完全一致视为同一条
+function isDuplicate(item) {
+  const key = dateKey(item)
+  if (!key) return false
+  return schedules.value.some(s => (s.title || '') === (item.title || '') && dateKey(s) === key)
+}
 
 async function handleSend(text) {
+  // ChatWindow 已禁用按钮，这里再挡一次，防止任何途径的重复触发
+  if (isParsing.value) return
+  isParsing.value = true
+
   try {
     // 调用 AI 解析
     const parsed = await parseText(text)
@@ -25,8 +42,19 @@ async function handleSend(text) {
       throw new Error('未识别到有效的时间信息')
     }
 
+    // 去重：已存在则不重复写入
+    if (isDuplicate(parsed)) {
+      chatWindowRef.value?.addAiMessage('⚠️ 该日程已存在：' + parsed.title)
+      return
+    }
+
     // 只有通过校验才写入存储
     schedules.value = addSchedule(parsed)
+
+    // 走了本地降级时给出提示
+    if (parsed.isFallback) {
+      chatWindowRef.value?.addAiMessage('⚡ 网络延迟，已启用本地极速解析')
+    }
 
     // 成功反馈
     chatWindowRef.value?.addAiMessage('✅ 已添加：' + parsed.title)
@@ -36,6 +64,7 @@ async function handleSend(text) {
     chatWindowRef.value?.addAiMessage('❌ 未识别到有效的时间信息，请补充具体的日期或时间。')
   } finally {
     // 无论成功失败都要解锁，否则按钮会一直停在「解析中…」
+    isParsing.value = false
     chatWindowRef.value?.setLoading(false)
   }
 }
@@ -114,7 +143,7 @@ const viewTitle = computed(() => {
       </nav>
       
       <div class="sidebar-bottom" v-show="!sidebarCollapsed">
-        <ChatWindow ref="chatWindowRef" @send="handleSend" />
+        <ChatWindow ref="chatWindowRef" :parsing="isParsing" @send="handleSend" />
       </div>
     </aside>
 

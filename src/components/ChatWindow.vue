@@ -1,6 +1,9 @@
 <script setup>
 import { ref } from 'vue'
 
+const props = defineProps({
+  parsing: { type: Boolean, default: false } // 父组件正在解析
+})
 const emit = defineEmits(['send'])
 const text = ref('')
 const messages = ref([])
@@ -18,7 +21,8 @@ function addAiMessage(content) {
 defineExpose({ addAiMessage, setLoading })
 
 function handleSend() {
-  if (isLoading.value) return
+  // 父组件在解析中，或自身已上锁，一律忽略
+  if (props.parsing || isLoading.value) return
   const t = text.value.trim()
   if (!t) return
   // 只添加用户消息
@@ -48,8 +52,8 @@ function handleSend() {
         placeholder="粘贴通知文本…"
         rows="3"
       ></textarea>
-      <button :disabled="isLoading" @click="handleSend">
-        {{ isLoading ? '解析中…' : '发送' }}
+      <button :disabled="parsing || isLoading" @click="handleSend">
+        {{ parsing || isLoading ? '解析中…' : '发送' }}
       </button>
     </div>
   </section>
