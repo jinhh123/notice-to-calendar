@@ -22,7 +22,21 @@ export default defineConfig(({ mode }) => {
           background_color: '#f9fafb',
           display: 'standalone',
           start_url: '/',
-          scope: '/'
+          scope: '/',
+          icons: [
+            {
+              src: '/pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any maskable'
+            },
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any maskable'
+            }
+          ]
         },
         workbox: {
           // 预缓存构建产物，首次访问后断网也能打开完整 UI
