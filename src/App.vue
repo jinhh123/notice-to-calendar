@@ -7,6 +7,7 @@ import { parseText } from './modules/parser'
 import { loadSchedules, addSchedule, removeSchedule, updateSchedule } from './modules/storage'
 // 注意：这里假设你已经把 ics.js 改成了 exporter.js 并实现了图片导出。如果还没改，这行会报错，请告诉我。
 import { exportToImage } from './modules/exporter'
+import { exportToICS } from './modules/icsExporter'
 
 const schedules = ref(loadSchedules())
 const selectedDay = ref(null)
@@ -62,6 +63,12 @@ async function handleExport() {
   await exportToImage(target)
 }
 
+// 导出 .ics：可导入系统日历 / Google Calendar / Outlook，与视图无关
+function handleExportICS() {
+  if (!schedules.value.length) return alert('还没有日程可导出')
+  exportToICS(schedules.value)
+}
+
 function handleDayClick(day) {
   selectedDay.value = day
 }
@@ -115,7 +122,10 @@ const viewTitle = computed(() => {
     <main class="main-content">
       <header class="main-header">
         <h1>{{ viewTitle }}</h1>
-        <button class="export" @click="handleExport">导出图片</button>
+        <div class="actions">
+          <button class="export ghost" @click="handleExportICS">导出日历(.ics)</button>
+          <button class="export" @click="handleExport">导出图片</button>
+        </div>
       </header>
       
       <div class="content-body">
@@ -263,6 +273,16 @@ const viewTitle = computed(() => {
 }
 .export:hover { background: #46a816; box-shadow: 0 4px 12px rgba(82,196,26,0.32); transform: translateY(-1px); }
 .export:active { transform: translateY(0); }
+
+.actions { display: flex; gap: 8px; }
+.export.ghost {
+  background: #fff; color: #1677ff; border: 1px solid #d6e6ff;
+  box-shadow: 0 2px 6px rgba(22,119,255,0.12);
+}
+.export.ghost:hover {
+  background: #f2f7ff; border-color: #b3d4ff;
+  box-shadow: 0 4px 12px rgba(22,119,255,0.18); transform: translateY(-1px);
+}
 .content-body {
   flex: 1; overflow: hidden; background: #fff; border-radius: 12px; padding: 18px;
   border: 1px solid #f0f1f3; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
